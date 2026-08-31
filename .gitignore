@@ -1,0 +1,30 @@
+# OS / 에디터
+.DS_Store
+.vscode/
+.idea/
+
+# 세션 히스토리 플러그인
+.remember/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 자격증명 — 절대 커밋 금지
+.env
+.env.*
+*credentials*.json
+*service-account*.json
+*.pem
+*.key
+
+# 대용량 데이터 — 상세 기준은 ../policy/30_data.md
+*.parquet
+*.csv.gz
+data/raw/
+data/interim/
+data/processed/
+logs/
