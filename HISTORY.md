@@ -12,6 +12,38 @@
 
 ---
 
+## 2026-09-01 — 콘솔 저장쿼리 6개 반입 완료, search_console 폴더 신설
+
+콘솔에만 있던 6개를 반입해 로컬이 콘솔 저장쿼리 17개를 전부 담게 됐다.
+
+| 반입 | 경로 |
+|---|---|
+| `01_ext_table_조회` | `signup_90days/90_ext_table_check.sql` |
+| `10_ext_파일별컬럼확인` | `signup_90days/91_ext_column_check.sql` |
+| `10_view_테이블조회` | `signup_90days/92_view_table_check.sql` |
+| `12_테이블리스트` | `signup_90days/93_table_list.sql` |
+| `SearchConsole_02_create_view` | `search_console/02_create_view.sql` |
+| `SearchConsole_03_dashboard_join_view` | `search_console/03_dashboard_join_view.sql` |
+
+읽어보고 정정한 것:
+
+- **`_tmp_onefile_schema`는 정리 대상이 아니었다.** `91_ext_column_check.sql`이 매 실행마다
+  `CREATE OR REPLACE`로 다시 만드는 일회용 외부 테이블이다. 앞서 "방치된 잔여물"로
+  적었던 것을 바로잡는다. 6개를 읽기 전에 지웠다면 그 유틸이 깨졌을 것이다.
+- **SearchConsole 2개는 미배포 초안이다.** 전체가 `/* */`로 감싸여 있어 실행해도 아무 일도
+  일어나지 않는다. `carbiz-6f7fc.searchconsole` 데이터셋에는 원본 export 테이블만 있고
+  `v_page_daily` / `v_monthly_summary` / `v_yoy_monthly` / `v_dashboard_main` 중
+  실제로 존재하는 것은 하나도 없다. 파일 선두에 그 사실을 적어뒀다.
+- `92_view_table_check.sql`은 `SELECT *`에 `LIMIT`이 없어 그대로 돌리면 약 48MB를 스캔한다.
+  주석 처리된 `WHERE`/`LIMIT` 중 하나를 푸는 것을 전제로 만든 쿼리다. README에 적었다.
+
+부수: 프로젝트에 `analytics_429050434`, `analytics_528628070`, `analytics_528629362`,
+`ga4_mkt_analytics` 데이터셋이 더 있다. 현재 이 작업장의 범위 밖이며 README에 명시만 해뒀다.
+
+SearchConsole 파일에 남아 있던 도메인 지식은 보존한다: `query` dimension을 넣으면
+클릭/노출이 과소집계되므로 정확한 수치는 `query`를 빼고 집계해야 하고,
+`avg_position`은 `SAFE_DIVIDE(sum_position, impressions)`로 계산한다.
+
 ## 2026-09-01 — signup_2025 미사용 확정, 80/81에 표시
 
 `signup_2025` 데이터셋이 2026-02 이후 갱신이 멈춘 것을 확인했다. 현재 쓰지 않는다.

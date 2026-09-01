@@ -41,6 +41,10 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 | `07_view_by_snapshot_date.sql` | `07_view_by_snapshot_date` | 스냅샷 날짜별 뷰 | |
 | `50_run_log.sql` | `50_run_log` | 실행 로그 테이블 정의 | 최초 1회 |
 | `51_run_merge_statement.sql` | `51_run_merge_statement` | MERGE 잡 7일치 모니터링 | 조회용 |
+| `90_ext_table_check.sql` | `01_ext_table_조회` | ext 테이블 특정 날짜 조회 | 수동 |
+| `91_ext_column_check.sql` | `10_ext_파일별컬럼확인` | 하루치 parquet 1개의 컬럼·타입 확인 | 수동 |
+| `92_view_table_check.sql` | `10_view_테이블조회` | 뷰/테이블 즉석 조회 (WHERE 예시 주석 모음) | 수동 |
+| `93_table_list.sql` | `12_테이블리스트` | 데이터셋의 테이블·뷰 목록 | 수동 |
 
 ### signup_2025/ — **미사용**
 
@@ -56,16 +60,27 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 소스 `signup_2025.signup_2025`(3,455행)는 2026-02-05에 한 번 적재된 일회성 수동
 적재본이다. 이 저장소의 어떤 SQL도 그것을 만들지 않는다.
 
-### 미반입 (콘솔에만 있음)
+### search_console/ — **미배포 초안**
 
-| 콘솔 저장쿼리 | 반입 예정 경로 |
-|---|---|
-| `01_ext_table_조회` | `signup_90days/90_ext_table_check.sql` |
-| `10_ext_파일별컬럼확인` | `signup_90days/91_ext_column_check.sql` |
-| `10_view_테이블조회` | `signup_90days/92_view_table_check.sql` |
-| `12_테이블리스트` | `signup_90days/93_table_list.sql` |
-| `SearchConsole_02_create_view` | `search_console/02_create_view.sql` |
-| `SearchConsole_03_dashboard_join_view` | `search_console/03_dashboard_join_view.sql` |
+두 파일 모두 **전체가 주석으로 감싸여 있어 실행해도 아무 일도 일어나지 않는다.**
+`carbiz-6f7fc.searchconsole` 데이터셋에는 원본 export 테이블만 있고 아래 `v_*` 뷰는
+하나도 존재하지 않는다. 쓰려면 주석을 풀고 실행해야 한다.
+
+| 파일 | 콘솔 저장쿼리 | 만들려는 뷰 |
+|---|---|---|
+| `02_create_view.sql` | `SearchConsole_02_create_view` | `v_page_daily`, `v_monthly_summary`, `v_yoy_monthly` |
+| `03_dashboard_join_view.sql` | `SearchConsole_03_dashboard_join_view` | `v_dashboard_main` |
+
+파일 주석에 남아 있는 핵심 원칙: **`query` dimension을 넣으면 클릭/노출이 과소집계된다.**
+정확한 수치는 `query`를 빼고 집계해야 하며 `avg_position`은
+`SAFE_DIVIDE(sum_position, impressions)`로 계산한다.
+
+## 프로젝트의 다른 데이터셋
+
+이 작업장은 `signup_90days` / `signup_2025` / `searchconsole`만 다룬다.
+프로젝트에는 아래도 있으나 현재 범위 밖이다.
+
+`analytics_429050434`, `analytics_528628070`, `analytics_528629362`, `ga4_mkt_analytics`
 
 ## 번호 체계
 
@@ -113,11 +128,12 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
   둘에 남은 차이는 행 범위(`rn = 1` 여부)와 dedup `PARTITION`의 `snapshot_date`
   포함 여부 두 곳뿐이다. 한쪽만 고치지 않는다.
 
-## 정리 대상
+## 알아둘 객체
 
 | 객체 | 내용 |
 |---|---|
-| `signup_90days._tmp_onefile_schema` | 스키마 확인용 임시 외부 테이블. 2026-02-11 생성 후 방치. `dt=2026-01-29` 하루치만 가리키며 어느 SQL도 참조하지 않는다. 외부 테이블이라 삭제해도 GCS 원본은 남는다. |
+| `signup_90days._tmp_onefile_schema` | `91_ext_column_check.sql`이 매 실행마다 `CREATE OR REPLACE`로 다시 만드는 일회용 외부 테이블이다. 방치된 잔여물이 아니다. 지워도 그 쿼리를 다시 돌리면 살아난다. 외부 테이블이라 GCS 원본과 무관하다. |
+| `92_view_table_check.sql` | `SELECT *`에 `LIMIT`이 없다. 그대로 돌리면 약 48MB를 스캔한다. 파일 안의 주석 처리된 `WHERE`/`LIMIT` 중 하나를 풀고 쓰는 것을 전제로 만든 쿼리다. |
 
 ## 관련 정책
 
