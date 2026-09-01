@@ -5,8 +5,21 @@ BigQuery 쿼리 관리. 데이터셋 단위 SQL 폴더.
 ## 목적
 
 BigQuery에 배포되는 SQL의 **단일 진실 공급원(SSOT)**이다.
-콘솔에서 직접 고치지 않는다. 여기서 고치고 콘솔에 반영한다.
-반대로 하면 로컬이 낡고, 다음에 배포할 때 콘솔의 수정이 덮여 사라진다.
+콘솔에서 직접 고치지 않는다. 여기서 고치고 배포한다.
+
+### 콘솔 저장쿼리를 두지 않는 이유
+
+파이프라인 쿼리(`01`~`07`)는 콘솔 저장쿼리를 **두지 않는다.** 2026-09-01에 전부 삭제했다.
+
+저장쿼리는 파일과 분리된 사본이라 자동으로 동기화되지 않는다. 배포할 때마다 콘솔에서도
+갈아끼워야 하고, 한 번만 빼먹으면 어긋난다. 어긋난 저장쿼리를 누군가 실행하면
+뷰가 과거 정의로 되돌아간다. 얻는 것은 "목록에서 클릭 한 번"이고 치르는 것은
+매번 이중 작업이라 남는 장사가 아니다.
+
+조회·점검용(`50`, `51`, `90`~`93`)은 남겨둔다. 뷰나 테이블을 바꾸지 않으므로
+본문이 낡아도 사고가 나지 않고, 콘솔에서 바로 실행하는 편이 편하다.
+
+필요하면 언제든 파일 내용을 붙여넣어 다시 저장할 수 있다. 원본은 여기에 있다.
 
 ## 데이터 흐름 — signup_90days
 
@@ -31,20 +44,20 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 
 | 파일 | 콘솔 저장쿼리 | 역할 | 갱신 |
 |---|---|---|---|
-| `01_ext_table.sql` | `00_ext_table생성/변경` | 외부 테이블 생성/재생성 | 스키마 변경 시 |
-| `02_raw_table.sql` | `02_raw_table_생성` | 네이티브 테이블 정의 | 컬럼 추가 시 |
+| `01_ext_table.sql` | 없음 (삭제) | 외부 테이블 생성/재생성 | 스키마 변경 시 |
+| `02_raw_table.sql` | 없음 (삭제) | 네이티브 테이블 정의 | 컬럼 추가 시 |
 | `03_merge_daily.sql` | (예약쿼리 `update_daily`) | 일별 MERGE 적재 + 로그 | 매일 23:00 KST 자동 |
-| `03b_merge_backfill.sql` | `03_merge_update` | 수동 소급 적재용 변형 | 누락 발생 시 수동 |
-| `04_view_derived.sql` | `04_view_table_파생변수추가` | 히스토리 뷰 + 파생컬럼 | 파생 추가 시 |
-| `05_view_latest.sql` | `05_view_latest` | 회사별 최신 1행 뷰 | |
-| `06_monthly_kpi_summary.sql` | `06_monthly_kpi_summary` | 가입월별 KPI 뷰 | |
-| `07_view_by_snapshot_date.sql` | `07_view_by_snapshot_date` | 스냅샷 날짜별 뷰 | |
+| `03b_merge_backfill.sql` | 없음 (삭제) | 수동 소급 적재용 변형 | 누락 발생 시 수동 |
+| `04_view_derived.sql` | 없음 (삭제) | 히스토리 뷰 + 파생컬럼 | 파생 추가 시 |
+| `05_view_latest.sql` | 없음 (삭제) | 회사별 최신 1행 뷰 | |
+| `06_monthly_kpi_summary.sql` | 없음 (삭제) | 가입월별 KPI 뷰 | |
+| `07_view_by_snapshot_date.sql` | 없음 (삭제) | 스냅샷 날짜별 뷰 | |
 | `50_run_log.sql` | `50_run_log` | 실행 로그 테이블 정의 | 최초 1회 |
 | `51_run_merge_statement.sql` | `51_run_merge_statement` | MERGE 잡 7일치 모니터링 | 조회용 |
-| `90_ext_table_check.sql` | `01_ext_table_조회` | ext 테이블 특정 날짜 조회 | 수동 |
-| `91_ext_column_check.sql` | `10_ext_파일별컬럼확인` | 하루치 parquet 1개의 컬럼·타입 확인 | 수동 |
-| `92_view_table_check.sql` | `10_view_테이블조회` | 뷰/테이블 즉석 조회 (WHERE 예시 주석 모음) | 수동 |
-| `93_table_list.sql` | `12_테이블리스트` | 데이터셋의 테이블·뷰 목록 | 수동 |
+| `90_ext_table_check.sql` | `90_ext_table_check` | ext 테이블 특정 날짜 조회 | 수동 |
+| `91_ext_column_check.sql` | `91_ext_column_check` | 하루치 parquet 1개의 컬럼·타입 확인 | 수동 |
+| `92_view_table_check.sql` | `92_view_table_check` | 뷰/테이블 즉석 조회 (WHERE 예시 주석 모음) | 수동 |
+| `93_table_list.sql` | `93_table_list` | 데이터셋의 테이블·뷰 목록 | 수동 |
 
 ### signup_2025/ — **미사용**
 
