@@ -85,17 +85,31 @@ WITH base AS (
       ELSE 'free'
     END AS contract_type_refine,
 
-    /* 요금제 상태 — free / trial / paid 단일 판정. 상호배타이며 합이 전체와 일치한다.
+    /* 요금제 구분 — free / trial / plus / premium. 상호배타이며 합이 전체와 일치한다.
+       요금제 판정은 이 컬럼 하나에서만 한다. plan_status와 is_paid_flag는 여기서 파생된다.
        - pricing_plan 실제 값은 대문자 FREE / PLUS / PREMIUM 3종
        - FREE는 is_trial_active와 무관하게 free.
          FREE + 체험중 조합은 user_count=0인 탈퇴/미개통 계정에서 체험 플래그가
          참으로 남은 것이지 실제 체험이 아니다.
-       - PLUS/PREMIUM은 체험중이면 trial, 아니면 paid */
+       - PLUS/PREMIUM은 체험중이면 trial, 아니면 요금제 이름 그대로 */
     CASE
       WHEN r.pricing_plan IS NULL OR UPPER(TRIM(r.pricing_plan)) = 'FREE' THEN 'free'
       WHEN COALESCE(r.is_trial_active, FALSE) THEN 'trial'
-      ELSE 'paid'
-    END AS plan_status,
+      WHEN UPPER(TRIM(r.pricing_plan)) = 'PLUS' THEN 'plus'
+      ELSE 'premium'
+    END AS plan_detail,
+
+    /* 중복기업 판정용 정규화 회사명.
+       표기 흔들림만 제거한다 — 법인격 표기와 공백. 의미를 바꾸는 절단은 하지 않는다.
+       지점·부서 표기를 자르면 서로 다른 고객사가 하나로 합쳐져 통계에서 사라진다.
+       05 / 07 / 06_monthly_base가 모두 이 컬럼을 상속받아 같은 기준으로 판정한다. */
+    REGEXP_REPLACE(
+      REGEXP_REPLACE(
+        LOWER(TRIM(r.company_name)),
+        r'\(주\)|\(유\)|\(재\)|\(사\)|㈜|주식회사|유한회사|유한책임회사|재단법인|사단법인|농업회사법인|영어조합법인',
+        ''),
+      r'\s+', ''
+    ) AS company_name_norm,
 
     /* 2) 초기 5회 평균 운행거리 */
     SAFE_DIVIDE(r.first_5_trips_distance, LEAST(r.trip_count_total, 5)) AS avg_distance_first_5_trips,
@@ -179,11 +193,15 @@ paid AS (
   SELECT
     b.*,
 
+    /* 요금제 상태 롤업 — plus/premium을 paid로 묶는다.
+       판정은 plan_detail에서 이미 끝났고 여기서는 묶기만 한다. */
+    IF(b.plan_detail IN ('plus', 'premium'), 'paid', b.plan_detail) AS plan_status,
+
     /* 유료 여부 (Looker SUM용 0/1) */
-    IF(b.plan_status = 'paid', 1, 0) AS is_paid_flag,
+    IF(b.plan_detail IN ('plus', 'premium'), 1, 0) AS is_paid_flag,
 
     /* 회사별 최초 유료 스냅샷일 */
-    MIN(IF(b.plan_status = 'paid', b.snapshot_date, NULL))
+    MIN(IF(b.plan_detail IN ('plus', 'premium'), b.snapshot_date, NULL))
       OVER (PARTITION BY b.company_code) AS paid_first_snapshot_date
 
   FROM base b
@@ -235,6 +253,12 @@ final AS (
 
     /* 탈퇴기업 여부 — user_count = 0 */
     COALESCE(paid.user_count = 0, FALSE) AS is_withdrawn_company,
+
+    /* 실제 라이선스 수.
+       무료·체험 기업은 라이선스가 100으로 기본 지급되어 실제 사용 규모가 아니다.
+       그래서 무료·체험은 차량수로 대체하고, 유료만 license_count를 그대로 쓴다.
+       집계에서 라이선스를 셀 때는 항상 이 컬럼을 쓴다. */
+    IF(paid.plan_status = 'paid', paid.license_count, paid.vehicle_count) AS license_count_adjusted,
 
     /* 회사별 최신 스냅샷 순번 (1 = 최신).
        05는 rn = 1로 좁히고, 07은 좁히지 않는다. */

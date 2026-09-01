@@ -24,10 +24,9 @@ WITH latest AS (
 ),
 
 dedup AS (
-  /* 중복 판정용 정규화 회사명 — 대소문자/공백 차이로 인한 오탐 방지 */
-  SELECT
-    latest.*,
-    LOWER(TRIM(latest.company_name)) AS company_name_norm
+  /* company_name_norm은 view_signup_90days(04)에서 만든 것을 상속받는다.
+     여기서 다시 정의하지 않는다. 05 / 07 / 06_monthly_base가 같은 기준을 써야 한다. */
+  SELECT latest.*
   FROM latest
 ),
 

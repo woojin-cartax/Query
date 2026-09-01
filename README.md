@@ -31,7 +31,10 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
   → view_signup_90days                        전체 히스토리 + 파생컬럼
        ├→ view_signup_90days_latest           회사별 최신 1행 + 중복/이탈 판정
        │      └→ view_signup_90days_monthly_summary   가입월별 KPI
-       └→ view_signup_90days_by_snapshot      스냅샷 날짜별 전체 (latest의 rn=1 미적용판)
+       ├→ view_signup_90days_by_snapshot      스냅샷 날짜별 전체 (latest의 rn=1 미적용판)
+       └→ view_signup_90days_monthly_base     월말 기준일 x 회사. 월별 리포트 토대
+              ├→ view_signup_90days_monthly_summary   월별 요약 (표1)
+              └→ view_signup_90days_monthly_by_plan   월별 요금제 분포 (표2)
 ```
 
 `signup_2025`는 연간 분석용 별개 데이터셋이며 위 흐름과 독립이다.
@@ -49,8 +52,10 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 | `03_merge_daily.sql` | (예약쿼리 `update_daily`) | 일별 MERGE 적재 + 로그. 백필 템플릿 포함 | 매일 23:00 KST 자동 |
 | `04_view_derived.sql` | 없음 (삭제) | 히스토리 뷰 + 파생컬럼 | 파생 추가 시 |
 | `05_view_latest.sql` | 없음 (삭제) | 회사별 최신 1행 뷰 | |
-| `06_monthly_kpi_summary.sql` | 없음 (삭제) | 가입월별 KPI 뷰 | |
-| `07_view_by_snapshot_date.sql` | 없음 (삭제) | 스냅샷 날짜별 뷰 | |
+| `06_monthly_base.sql` | 없음 | 월말 기준일 x 회사. 월별 리포트의 토대 + 제외 사유 | |
+| `07_view_by_snapshot_date.sql` | 없음 | 스냅샷 날짜별 뷰 | |
+| `08_monthly_summary.sql` | 없음 | 월별 요약 (가입수·전환율·평균라이선스) | |
+| `09_monthly_by_plan.sql` | 없음 | 월별 요금제 분포 (기업수·라이선스·평균) | |
 | `50_run_log.sql` | `50_run_log` | 실행 로그 테이블 정의 | 최초 1회 |
 | `51_run_merge_statement.sql` | `51_run_merge_statement` | MERGE 잡 7일치 모니터링 | 조회용 |
 | `90_ext_table_check.sql` | `90_ext_table_check` | ext 테이블 특정 날짜 조회 | 수동 |
@@ -159,12 +164,44 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
 - 유료/체험/무료 판정은 `04_view_derived.sql`의 `plan_status` **하나뿐이다.**
   하위 뷰에서 다시 정의하지 않는다.
 - `contract_type_refine`은 계약기간 표현 전용이다. 유료 판정에 쓰지 않는다.
+- **집계에서 라이선스를 셀 때는 `license_count_adjusted`를 쓴다.** 무료·체험 기업은
+  라이선스가 100으로 기본 지급되므로 원본 `license_count`를 그대로 더하면 규모가 왜곡된다.
+  무료·체험은 차량수로 대체하고 유료만 원값을 쓴다.
+- **요금제 판정은 `plan_detail` 하나에서만 한다.** `plan_status`(free/trial/paid)와
+  `is_paid_flag`는 거기서 파생된 값이다. 새 구분이 필요하면 `plan_detail`을 고친다.
+- **`06_monthly_base`의 중복 판정은 `05`/`07`과 다르다.** 모집단이 "기준일 이하 전체
+  기록에서 회사코드별 마지막 관측 행"이다. raw가 가입 후 90일까지만 쌓이므로,
+  그 시점 스냅샷만 보면 같은 회사인데 일부 계정이 안 보인 채로 판정하게 되기 때문이다.
 - **`license_count`의 GCS 원본 컬럼명은 `license_type`이다.** 이름이 타입처럼 보이지만
   실제 의미는 라이선스 개수다. 상류 parquet은 바꿀 수 없어 적재하면서 별칭을 준다
   (`03_merge_daily.sql`). raw 테이블부터는 `license_count`로만 존재한다.
 - 파생컬럼은 `04_view_derived.sql`에서 한 번만 만든다. `05`/`07`은 상속만 받으며,
   둘에 남은 차이는 행 범위(`rn = 1` 여부)와 dedup `PARTITION`의 `snapshot_date`
   포함 여부 두 곳뿐이다. 한쪽만 고치지 않는다.
+
+## 월별 리포트 뽑기
+
+```sql
+-- 표1: 월별 요약
+SELECT * FROM `carbiz-6f7fc.signup_90days.view_signup_90days_monthly_summary`
+ORDER BY ref_month DESC;
+
+-- 표2: 월별 요금제 분포
+SELECT * FROM `carbiz-6f7fc.signup_90days.view_signup_90days_monthly_by_plan`
+WHERE ref_month = '2026-07';
+
+-- 집계에서 제외된 기업 목록과 사유
+SELECT ref_month, exclude_reason, company_code, company_name, company_name_norm,
+       plan_detail, vehicle_count, user_count, trip_count_recent_2w,
+       duplicate_company_count, paid_account_count, duplicate_keep_rank
+FROM `carbiz-6f7fc.signup_90days.view_signup_90days_monthly_base`
+WHERE ref_month = '2026-07' AND signup_year_month = ref_month
+  AND exclude_reason IS NOT NULL
+ORDER BY exclude_reason, company_name_norm, duplicate_keep_rank;
+```
+
+`exclude_reason`은 `test` / `withdrawn` / `duplicate` 중 하나다. 같은 이름 그룹이
+나란히 나오므로 왜 빠졌는지 바로 보인다.
 
 ## 알아둘 객체
 
