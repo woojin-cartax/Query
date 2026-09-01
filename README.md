@@ -54,8 +54,11 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 
 | 파일 | 콘솔 저장쿼리 | 역할 | 최종 갱신 |
 |---|---|---|---|
-| `80_year_merge.sql` | `80_year_merge` | 연간 스냅샷 테이블 + 뷰 | 2026-02-12 |
-| `81_year_detail_merge.sql` | `81_year_detail_merge` | 상세 parquet → ext → raw → 뷰 | 2026-02-26 |
+| `80_year_merge.sql` | 없음 (2026-09-01 삭제) | 연간 스냅샷 테이블 + 뷰 | 2026-02-12 |
+| `81_year_detail_merge.sql` | 없음 (2026-09-01 삭제) | 상세 parquet → ext → raw → 뷰 | 2026-02-26 |
+
+콘솔 저장쿼리는 지웠다. 선두 `DROP TABLE`을 무심코 실행할 여지를 없애기 위해서다.
+내용은 이 파일들에 그대로 있으므로 다시 쓸 일이 생기면 복붙하면 된다.
 
 소스 `signup_2025.signup_2025`(3,455행)는 2026-02-05에 한 번 적재된 일회성 수동
 적재본이다. 이 저장소의 어떤 SQL도 그것을 만들지 않는다.
