@@ -5,7 +5,7 @@ WITH filtered AS (
   SELECT
     *,
     /* 무료/체험은 라이선스 수 개념이 없으므로 차량수로 대체 */
-    IF(plan_status IN ('free', 'trial'), vehicle_count, license_type) AS effective_license_count
+    IF(plan_status IN ('free', 'trial'), vehicle_count, license_count) AS effective_license_count
   FROM `carbiz-6f7fc.signup_90days.view_signup_90days_latest`
   WHERE is_test_account = FALSE
     AND is_withdrawn_company = FALSE

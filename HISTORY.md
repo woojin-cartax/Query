@@ -12,6 +12,32 @@
 
 ---
 
+## 2026-09-01 — license_type -> license_count 리네임
+
+이름이 타입처럼 보이지만 실제 의미는 라이선스 **개수**였다. `06`이 그렇게 쓰고 있었고
+`user_count` / `vehicle_count` / `effective_license_count` 와도 결이 맞지 않았다.
+
+GCS parquet의 원본 컬럼명은 `license_type`이라 상류를 바꿀 수 없다. 적재하면서
+별칭을 주는 방식으로 해결했다 (`CAST(license_type AS INT64) AS license_count`).
+raw 테이블부터 아래로는 `license_count`로만 존재한다.
+
+`ALTER TABLE ... RENAME COLUMN` 으로 데이터 재적재 없이 처리했다. 203,693행 그대로다.
+앞서 "raw 재생성이라 비용이 크다"고 적었던 판단은 틀렸다.
+
+작업 순서 (틀리면 적재가 깨진다):
+1. raw 컬럼 rename -> 이 순간 `06`이 잠깐 깨진다
+2. `06` 즉시 재배포
+3. `03_merge_daily` 반영 (`bq update --transfer_config`, 바이트 대조 확인)
+4. `02` / `03b` 파일 수정
+
+**뷰 스키마는 자동 갱신되지 않는다.** `04`/`05`/`07`은 `r.*`를 쓰는데도 rename 후
+`bq show`에 여전히 `license_type`이 남아 있었다. 뷰가 생성 시점의 스키마를
+저장해두기 때문이다. 셋 다 재배포해서 갱신했다. 컬럼 rename 후에는 `*`를 쓰는
+하위 뷰까지 전부 다시 배포해야 한다.
+
+검증: 수동 1회 실행에서 `updated_rows = 614` 정상. KPI 뷰 값도 정상.
+`80_year_merge.sql`은 미사용이라 손대지 않았다.
+
 ## 2026-09-01 — 예약쿼리에 실패 로깅 추가 (run_log 정상화)
 
 `query_run_log`는 만들어진 이래 `status`가 항상 `SUCCESS`였다. MERGE가 실패하면

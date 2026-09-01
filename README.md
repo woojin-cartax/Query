@@ -141,6 +141,9 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
 - 유료/체험/무료 판정은 `04_view_derived.sql`의 `plan_status` **하나뿐이다.**
   하위 뷰에서 다시 정의하지 않는다.
 - `contract_type_refine`은 계약기간 표현 전용이다. 유료 판정에 쓰지 않는다.
+- **`license_count`의 GCS 원본 컬럼명은 `license_type`이다.** 이름이 타입처럼 보이지만
+  실제 의미는 라이선스 개수다. 상류 parquet은 바꿀 수 없어 적재하면서 별칭을 준다
+  (`03_merge_daily.sql`). raw 테이블부터는 `license_count`로만 존재한다.
 - 파생컬럼은 `04_view_derived.sql`에서 한 번만 만든다. `05`/`07`은 상속만 받으며,
   둘에 남은 차이는 행 범위(`rn = 1` 여부)와 dedup `PARTITION`의 `snapshot_date`
   포함 여부 두 곳뿐이다. 한쪽만 고치지 않는다.

@@ -55,7 +55,9 @@ USING (
     CAST(contract_type AS STRING) AS contract_type,
     CAST(contract_period AS STRING) AS contract_period,
     CAST(pricing_plan AS STRING) AS pricing_plan,
-    CAST(license_type AS INT64) AS license_type,
+    -- GCS parquet의 원본 컬럼명은 license_type이지만 실제 의미는 라이선스 '개수'다.
+    -- 상류를 바꿀 수 없으므로 적재하면서 이름을 바로잡는다.
+    CAST(license_type AS INT64) AS license_count,
     SAFE.PARSE_DATETIME('%Y-%m-%d %H:%M:%S', is_booking_date) AS is_booking_date,
     CAST(user_count AS INT64) AS user_count,
     CAST(vehicle_count AS INT64) AS vehicle_count,
@@ -96,7 +98,7 @@ WHEN MATCHED THEN
     T.contract_type = S.contract_type,
     T.contract_period = S.contract_period,
     T.pricing_plan = S.pricing_plan,
-    T.license_type = S.license_type,
+    T.license_count = S.license_count,
     T.is_booking_date = S.is_booking_date,
     T.user_count = S.user_count,
     T.vehicle_count = S.vehicle_count,
@@ -127,7 +129,7 @@ WHEN NOT MATCHED THEN
   INSERT (
     snapshot_date, data_collection_time, sequence_id,
     company_code, company_name,
-    signup_date, signup_device, contract_type, contract_period, pricing_plan, license_type,
+    signup_date, signup_device, contract_type, contract_period, pricing_plan, license_count,
     is_booking_date, user_count, vehicle_count,
     is_trial_active, has_app_login,
     pc_first_login_date, pc_last_login_date,
@@ -142,7 +144,7 @@ WHEN NOT MATCHED THEN
   VALUES (
     S.snapshot_date, S.data_collection_time, S.sequence_id,
     S.company_code, S.company_name,
-    S.signup_date, S.signup_device, S.contract_type, S.contract_period, S.pricing_plan, S.license_type,
+    S.signup_date, S.signup_device, S.contract_type, S.contract_period, S.pricing_plan, S.license_count,
     S.is_booking_date, S.user_count, S.vehicle_count,
     S.is_trial_active, S.has_app_login,
     S.pc_first_login_date, S.pc_last_login_date,

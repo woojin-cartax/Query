@@ -22,7 +22,7 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.signup_90days.raw_signup_90days`
   contract_type STRING,
   contract_period STRING,
   pricing_plan STRING,
-  license_type INT64,
+  license_count INT64,     -- GCS parquet 원본 컬럼명은 license_type. 적재 시 별칭을 준다.
   is_booking_date DATETIME,
   user_count INT64,
   vehicle_count INT64,
