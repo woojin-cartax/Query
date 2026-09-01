@@ -161,7 +161,13 @@ WITH base AS (
     IF(first_trip_date_start IS NOT NULL, 1, 0) AS has_first_trip_flag,
 
     /* 반복 운행 여부 */
-    IF(trip_count_total >= 2, 1, 0) AS is_repeat_trip_flag
+    IF(trip_count_total >= 2, 1, 0) AS is_repeat_trip_flag,
+
+    /* 회사별 최초 이탈(churn) 감지일
+       05/07이 각자 churn_by_company CTE + LEFT JOIN으로 만들던 값을 여기로 올렸다.
+       윈도우로 계산하면 JOIN이 필요 없다. */
+    MIN(IF(r.is_churned, r.snapshot_date, NULL))
+      OVER (PARTITION BY r.company_code) AS is_churned_date
 
   FROM `carbiz-6f7fc.signup_90days.raw_signup_90days` r
 ),
@@ -194,7 +200,48 @@ final AS (
     CASE
       WHEN paid.signup_date_company IS NULL OR paid.paid_first_snapshot_date IS NULL THEN NULL
       ELSE DATE_DIFF(paid.paid_first_snapshot_date, paid.signup_date_company, DAY)
-    END AS days_since_paid
+    END AS days_since_paid,
+
+    /* ---- 아래는 05/07이 각자 계산하던 공통 파생이다. 한 곳에서만 만든다. ---- */
+
+    /* 가입일부터 이탈까지 소요일 */
+    CASE
+      WHEN paid.is_churned_date IS NULL OR paid.signup_date IS NULL THEN NULL
+      ELSE DATE_DIFF(paid.is_churned_date, paid.signup_date, DAY)
+    END AS days_to_churn,
+
+    /* 가입 연 / 월 / 연월 (signup_date 기준) */
+    EXTRACT(YEAR FROM paid.signup_date) AS signup_year,
+    EXTRACT(MONTH FROM paid.signup_date) AS signup_month,
+    FORMAT_DATE('%Y-%m', paid.signup_date) AS signup_year_month,
+
+    /* 첫 운행 전에 이탈했는지 (BOOL) */
+    CASE
+      WHEN paid.is_churned_date IS NULL THEN NULL
+      WHEN paid.first_trip_date_start IS NULL THEN TRUE
+      ELSE DATE(paid.is_churned_date) < DATE(paid.first_trip_date_start)
+    END AS churn_before_activation,
+
+    /* 첫 운행 전에 이탈했는지 (SUM용 FLAG: 0/1) */
+    CASE
+      WHEN paid.is_churned_date IS NULL THEN 0
+      WHEN paid.first_trip_date_start IS NULL THEN 1
+      WHEN DATE(paid.is_churned_date) < DATE(paid.first_trip_date_start) THEN 1
+      ELSE 0
+    END AS churn_before_activation_flag,
+
+    /* 선결제 여부 — 예약일 존재 + 체험 활성. 유료(is_paid_flag)와는 별개 지표다. */
+    IF(paid.is_booking_date IS NOT NULL AND paid.is_trial_active_flag = 1, 1, 0) AS is_pre_paid_flag,
+
+    /* 탈퇴기업 여부 — user_count = 0 */
+    COALESCE(paid.user_count = 0, FALSE) AS is_withdrawn_company,
+
+    /* 회사별 최신 스냅샷 순번 (1 = 최신).
+       05는 rn = 1로 좁히고, 07은 좁히지 않는다. */
+    ROW_NUMBER() OVER (
+      PARTITION BY paid.company_code
+      ORDER BY paid.snapshot_date DESC, paid.data_collection_time DESC
+    ) AS rn
 
   FROM paid
 )
