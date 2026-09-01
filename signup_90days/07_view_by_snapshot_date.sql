@@ -101,9 +101,11 @@ dedup_flagged AS (
       PARTITION BY dedup.snapshot_date, dedup.company_name_norm
     ) AS paid_account_count,
 
+    /* 정렬키 동점 시 company_code로 결정적 tiebreak. 근거는 05_view_latest.sql 참조 */
     ROW_NUMBER() OVER (
       PARTITION BY dedup.snapshot_date, dedup.company_name_norm
-      ORDER BY dedup.vehicle_count DESC, dedup.trip_count_total DESC, dedup.total_distance DESC, dedup.user_count DESC
+      ORDER BY dedup.vehicle_count DESC, dedup.trip_count_total DESC, dedup.total_distance DESC, dedup.user_count DESC,
+               dedup.company_code
     ) AS duplicate_keep_rank
 
   FROM dedup

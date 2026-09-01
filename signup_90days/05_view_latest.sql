@@ -151,10 +151,15 @@ dedup_flagged AS (
     /* 동일 회사명 중 유료 계정 수 */
     SUM(dedup.is_paid_flag) OVER (PARTITION BY dedup.company_name_norm) AS paid_account_count,
 
-    /* 동일 회사명 중 유지 우선순위: 차량수 > 운행수 > 누적운행거리 > 사용자수 */
+    /* 동일 회사명 중 유지 우선순위: 차량수 > 운행수 > 누적운행거리 > 사용자수
+       마지막 company_code는 동점 시 결정적 tiebreak다. 활동량이 전부 0인 빈 계정끼리
+       같은 회사명으로 묶이면 정렬키 4개가 모두 동점이 되어 ROW_NUMBER의 순위가
+       실행마다 달라진다. 실제로 같은 그룹에서 세 번 실행에 세 번 다른 계정이
+       살아남는 것을 확인했다. 어느 계정이 남느냐는 임의지만 항상 같아야 한다. */
     ROW_NUMBER() OVER (
       PARTITION BY dedup.company_name_norm
-      ORDER BY dedup.vehicle_count DESC, dedup.trip_count_total DESC, dedup.total_distance DESC, dedup.user_count DESC
+      ORDER BY dedup.vehicle_count DESC, dedup.trip_count_total DESC, dedup.total_distance DESC, dedup.user_count DESC,
+               dedup.company_code
     ) AS duplicate_keep_rank
 
   FROM dedup
