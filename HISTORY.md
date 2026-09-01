@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-09-01 — 예약쿼리에 실패 로깅 추가 (run_log 정상화)
+
+`query_run_log`는 만들어진 이래 `status`가 항상 `SUCCESS`였다. MERGE가 실패하면
+스크립트가 중단돼 로그 INSERT 자체가 실행되지 않기 때문이다. `error_message`와
+`updated_rows`도 한 번도 채워진 적이 없다.
+
+`03_merge_daily.sql` 전체를 `BEGIN ... EXCEPTION WHEN ERROR THEN ... END` 로 감쌌다.
+
+- **실패해도 `FAIL` 행이 남는다.** BigQuery 스크립트는 문장 단위로 커밋되므로
+  `RAISE` 이전에 넣은 INSERT는 살아남는다. `RAISE`로 오류를 재발생시키지 않으면
+  예약쿼리가 "성공"으로 끝나 실패 메일이 오지 않으므로 반드시 재발생시킨다.
+- **`updated_rows`가 채워진다.** MERGE 직후 `@@row_count`(INSERT + UPDATE 총합)에서
+  순증분을 빼면 갱신 행수가 나온다.
+- **적재 0행은 `EMPTY`로 구분한다.** 0행일 때 실패처리(RAISE)는 하지 않기로 했다.
+  DTS 재시도로 로그가 중복되고, 원본이 늦게 올라오는 날에도 실패로 찍히기 때문이다.
+  0행 알림은 `monitoring/`의 아침 Slack 요약이 담당한다.
+
+`50_run_log.sql`의 `status` 주석에 `EMPTY`를 추가했다. 다만 이 파일은
+`CREATE TABLE IF NOT EXISTS`이고 테이블이 이미 있으므로 주석 변경은 배포되지 않는다.
+
+`monitoring/signup_90days_digest`가 `error_message`를 읽어 `FAIL` 시 원인 문구를
+Slack에 그대로 띄운다. 이 변경과 짝이다.
+
+미배포. 예약쿼리 `update_daily` 본문을 교체해야 반영된다. dry-run은 통과했으나
+`DECLARE`로 시작하는 멀티 스테이트먼트 스크립트라 검사가 얕다.
+콘솔 새 탭에서 수동 1회 실행해 정상 확인 후 예약쿼리에 넣는다.
+
 ## 2026-09-01 — signup_2025 콘솔 저장쿼리 삭제
 
 `80_year_merge`, `81_year_detail_merge` 저장쿼리를 콘솔에서 삭제했다.

@@ -14,6 +14,8 @@
 History
 ====================================
 - ver1.0 20260112 컬럼 1차 확정 @전우진
+- ver1.2 20260901 BEGIN/EXCEPTION 도입. 실패해도 FAIL 행이 남고 실패 메일이 온다.
+                  updated_rows 채움. 적재 0행은 EMPTY로 구분.
 
 
 ====================================
@@ -23,6 +25,13 @@ History
 DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 0 DAY);
 DECLARE before_cnt INT64;
 DECLARE after_cnt INT64;
+DECLARE merged_cnt INT64;
+
+/* 아래 전체를 감싼다. 어느 단계에서 실패하든 EXCEPTION 절이 FAIL 행을 남긴 뒤
+   오류를 재발생시킨다. 재발생시키지 않으면 예약쿼리가 "성공"으로 끝나 실패 메일이
+   오지 않는다. BigQuery 스크립트는 문장 단위로 커밋되므로 RAISE 이전에 넣은
+   INSERT는 살아남는다. */
+BEGIN
 
 -- 1️⃣ 실행 전 row 수
 SET before_cnt = (
@@ -146,6 +155,9 @@ WHEN NOT MATCHED THEN
     CURRENT_TIMESTAMP()
   );
 
+-- MERGE가 건드린 총 행수 (INSERT + UPDATE). 반드시 MERGE 바로 다음에 읽어야 한다.
+SET merged_cnt = @@row_count;
+
 -- 3️⃣ 실행 후 row 수
 SET after_cnt = (
   SELECT COUNT(*)
@@ -154,14 +166,33 @@ SET after_cnt = (
 );
 
 -- 4️⃣ 로그 남기기
+--    status      : 적재 결과가 0행이면 EMPTY. GCS에 원본이 안 올라온 날을 구분한다.
+--    inserted_rows: 신규 행수 (순증분)
+--    updated_rows : MERGE가 갱신한 행수 = 총 영향 행수 - 신규 행수
 INSERT INTO `carbiz-6f7fc.signup_90days.query_run_log`
 VALUES (
   target_dt,
   'daily_signup_merge',
   'raw_signup_90days',
-  'SUCCESS',
+  IF(after_cnt = 0, 'EMPTY', 'SUCCESS'),
   after_cnt - before_cnt,
-  NULL,
+  merged_cnt - (after_cnt - before_cnt),
   NULL,
   CURRENT_TIMESTAMP()
 );
+
+EXCEPTION WHEN ERROR THEN
+  -- 실패 흔적을 남긴 뒤 오류를 그대로 재발생시킨다.
+  INSERT INTO `carbiz-6f7fc.signup_90days.query_run_log`
+  VALUES (
+    target_dt,
+    'daily_signup_merge',
+    'raw_signup_90days',
+    'FAIL',
+    NULL,
+    NULL,
+    @@error.message,
+    CURRENT_TIMESTAMP()
+  );
+  RAISE USING MESSAGE = @@error.message;
+END;
