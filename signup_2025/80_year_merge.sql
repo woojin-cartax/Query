@@ -1,3 +1,22 @@
+/* =========================
+   [미사용] 2026-09-01 기준
+
+   signup_2025 데이터셋은 2026-02 이후 갱신이 멈췄고 현재 쓰이지 않는다.
+   이 파일은 참고용 보관이다. 실행하지 않는다.
+   선두의 DROP TABLE / CREATE OR REPLACE TABLE은 되돌릴 수 없다.
+
+   소스 `signup_2025.signup_2025`는 2026-02-05에 한 번 적재된 일회성 수동
+   적재본이며, 이 저장소의 어떤 SQL도 그것을 만들지 않는다.
+
+   아래 뷰는 04_view_derived.sql과 파생 구성이 어긋나 있다.
+     - 여기에만 있음: vehicle_segment / user_segment / trip_count_segment
+                      / trip_distance_segment
+     - 여기에 없음  : plan_status / is_paid_flag / paid_first_snapshot_date
+                      / days_since_paid
+     - is_test_account 정규식이 04와 다름 (유진의/조훈 누락)
+   미사용이므로 맞추지 않는다. 다시 쓰게 되면 그때 04 기준으로 재작성한다.
+========================= */
+
 -- 1. 기존 Table 삭제
 DROP TABLE IF EXISTS `carbiz-6f7fc.signup_2025.raw_signup_2025`;
 

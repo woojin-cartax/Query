@@ -42,12 +42,19 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 | `50_run_log.sql` | `50_run_log` | 실행 로그 테이블 정의 | 최초 1회 |
 | `51_run_merge_statement.sql` | `51_run_merge_statement` | MERGE 잡 7일치 모니터링 | 조회용 |
 
-### signup_2025/
+### signup_2025/ — **미사용**
 
-| 파일 | 콘솔 저장쿼리 | 역할 |
-|---|---|---|
-| `80_year_merge.sql` | `80_year_merge` | 연간 스냅샷 테이블 + 뷰 |
-| `81_year_detail_merge.sql` | `81_year_detail_merge` | 상세 parquet → ext → raw → 뷰 |
+데이터셋이 2026-02 이후 갱신이 멈췄고 현재 쓰이지 않는다. 참고용 보관이며 실행하지 않는다.
+`04_view_derived.sql`과 파생 구성이 어긋나 있으나 미사용이므로 맞추지 않는다.
+다시 쓰게 되면 그때 04 기준으로 재작성한다.
+
+| 파일 | 콘솔 저장쿼리 | 역할 | 최종 갱신 |
+|---|---|---|---|
+| `80_year_merge.sql` | `80_year_merge` | 연간 스냅샷 테이블 + 뷰 | 2026-02-12 |
+| `81_year_detail_merge.sql` | `81_year_detail_merge` | 상세 parquet → ext → raw → 뷰 | 2026-02-26 |
+
+소스 `signup_2025.signup_2025`(3,455행)는 2026-02-05에 한 번 적재된 일회성 수동
+적재본이다. 이 저장소의 어떤 SQL도 그것을 만들지 않는다.
 
 ### 미반입 (콘솔에만 있음)
 
@@ -102,6 +109,15 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
 - 유료/체험/무료 판정은 `04_view_derived.sql`의 `plan_status` **하나뿐이다.**
   하위 뷰에서 다시 정의하지 않는다.
 - `contract_type_refine`은 계약기간 표현 전용이다. 유료 판정에 쓰지 않는다.
+- 파생컬럼은 `04_view_derived.sql`에서 한 번만 만든다. `05`/`07`은 상속만 받으며,
+  둘에 남은 차이는 행 범위(`rn = 1` 여부)와 dedup `PARTITION`의 `snapshot_date`
+  포함 여부 두 곳뿐이다. 한쪽만 고치지 않는다.
+
+## 정리 대상
+
+| 객체 | 내용 |
+|---|---|
+| `signup_90days._tmp_onefile_schema` | 스키마 확인용 임시 외부 테이블. 2026-02-11 생성 후 방치. `dt=2026-01-29` 하루치만 가리키며 어느 SQL도 참조하지 않는다. 외부 테이블이라 삭제해도 GCS 원본은 남는다. |
 
 ## 관련 정책
 
