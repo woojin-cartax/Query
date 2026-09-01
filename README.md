@@ -1,29 +1,109 @@
 # query
 
-BigQuery 쿼리 관리. 데이터셋 단위 SQL 폴더
+BigQuery 쿼리 관리. 데이터셋 단위 SQL 폴더.
 
 ## 목적
 
-<!-- TODO: 이 작업장이 무엇을 위해 존재하는가 -->
+BigQuery에 배포되는 SQL의 **단일 진실 공급원(SSOT)**이다.
+콘솔에서 직접 고치지 않는다. 여기서 고치고 콘솔에 반영한다.
+반대로 하면 로컬이 낡고, 다음에 배포할 때 콘솔의 수정이 덮여 사라진다.
 
-## 데이터 흐름
+## 데이터 흐름 — signup_90days
 
-<!-- TODO: 입력이 어디서 와서 무엇을 거쳐 어디로 나가는가 -->
+```
+GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
+  → ext_signup_90days       외부 테이블 (hive 파티션, 파티션 필터 강제)
+  → raw_signup_90days       네이티브 (PARTITION snapshot_date / CLUSTER company_code)
+        ↑ 예약쿼리 update_daily 가 매일 23:00 KST 에 MERGE
+  → view_signup_90days                        전체 히스토리 + 파생컬럼
+       ├→ view_signup_90days_latest           회사별 최신 1행 + 중복/이탈 판정
+       │      └→ view_signup_90days_monthly_summary   가입월별 KPI
+       └→ view_signup_90days_by_snapshot      스냅샷 날짜별 전체 (latest의 rn=1 미적용판)
+```
+
+`signup_2025`는 연간 분석용 별개 데이터셋이며 위 흐름과 독립이다.
 
 ## 파일 구조
 
-| 파일/폴더 | 역할 | 실행/갱신 빈도 |
+`콘솔 저장쿼리` 열은 BigQuery 콘솔의 저장된 쿼리 이름이다. 파일명과 다르므로 이 표로 대응한다.
+
+### signup_90days/
+
+| 파일 | 콘솔 저장쿼리 | 역할 | 갱신 |
+|---|---|---|---|
+| `01_ext_table.sql` | `00_ext_table생성/변경` | 외부 테이블 생성/재생성 | 스키마 변경 시 |
+| `02_raw_table.sql` | `02_raw_table_생성` | 네이티브 테이블 정의 | 컬럼 추가 시 |
+| `03_merge_daily.sql` | (예약쿼리 `update_daily`) | 일별 MERGE 적재 + 로그 | 매일 23:00 KST 자동 |
+| `03b_merge_backfill.sql` | `03_merge_update` | 수동 소급 적재용 변형 | 누락 발생 시 수동 |
+| `04_view_derived.sql` | `04_view_table_파생변수추가` | 히스토리 뷰 + 파생컬럼 | 파생 추가 시 |
+| `05_view_latest.sql` | `05_view_latest` | 회사별 최신 1행 뷰 | |
+| `06_monthly_kpi_summary.sql` | `06_monthly_kpi_summary` | 가입월별 KPI 뷰 | |
+| `07_view_by_snapshot_date.sql` | `07_view_by_snapshot_date` | 스냅샷 날짜별 뷰 | |
+| `50_run_log.sql` | `50_run_log` | 실행 로그 테이블 정의 | 최초 1회 |
+| `51_run_merge_statement.sql` | `51_run_merge_statement` | MERGE 잡 7일치 모니터링 | 조회용 |
+
+### signup_2025/
+
+| 파일 | 콘솔 저장쿼리 | 역할 |
 |---|---|---|
-| | | |
+| `80_year_merge.sql` | `80_year_merge` | 연간 스냅샷 테이블 + 뷰 |
+| `81_year_detail_merge.sql` | `81_year_detail_merge` | 상세 parquet → ext → raw → 뷰 |
+
+### 미반입 (콘솔에만 있음)
+
+| 콘솔 저장쿼리 | 반입 예정 경로 |
+|---|---|
+| `01_ext_table_조회` | `signup_90days/90_ext_table_check.sql` |
+| `10_ext_파일별컬럼확인` | `signup_90days/91_ext_column_check.sql` |
+| `10_view_테이블조회` | `signup_90days/92_view_table_check.sql` |
+| `12_테이블리스트` | `signup_90days/93_table_list.sql` |
+| `SearchConsole_02_create_view` | `search_console/02_create_view.sql` |
+| `SearchConsole_03_dashboard_join_view` | `search_console/03_dashboard_join_view.sql` |
+
+## 번호 체계
+
+| 대역 | 용도 |
+|---|---|
+| `0x` | 파이프라인 본선 (ext → raw → merge → view) |
+| `5x` | 운영·모니터링 (로그, 잡 조회) |
+| `8x` | 연간 분석 |
+| `9x` | 조회·점검 유틸 (파이프라인에 영향 없음) |
+
+같은 단계의 변형은 `03b`처럼 접미 알파벳을 쓴다.
+파일명은 ASCII만 쓴다. 공백·한글은 셸과 도구에서 깨진다.
 
 ## 실행 방법
 
-<!-- TODO -->
+```bash
+# 문법·타입 검사 (실행 아님, 비용 0)
+bq query --use_legacy_sql=false --dry_run < signup_90days/04_view_derived.sql
+
+# 실제 배포
+bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
+```
+
+뷰는 의존 순서대로 배포한다: `04` → `05` → `07` → `06`.
+`04`를 먼저 올리지 않으면 하위 뷰가 컬럼을 못 찾아 실패한다.
 
 ## 주의
 
-<!-- TODO: 건드리면 안 되는 것, 흔한 함정 -->
+- **`02_raw_table.sql`은 통째로 실행하지 않는다.** 선두 `DROP TABLE`이 raw 누적
+  스냅샷을 전량 삭제한다. 복구는 GCS 원본으로부터 전량 재머지뿐이다.
+  `signup_2025/80_year_merge.sql`도 같다.
+- **`03_merge_daily.sql`은 예약쿼리 실물의 사본이다.** 파일을 고쳐도 예약쿼리는
+  바뀌지 않는다. 콘솔의 `update_daily`를 직접 수정해야 반영된다.
+  둘이 어긋나지 않았는지는 아래로 확인한다.
+  ```bash
+  bq show --format=prettyjson --transfer_config \
+    projects/975350524805/locations/asia-northeast3/transferConfigs/697bce99-0000-2450-996f-089e082437ec \
+    | python3 -c "import json,sys; print(json.load(sys.stdin)['params']['query'])" \
+    | diff - signup_90days/03_merge_daily.sql
+  ```
+- 유료/체험/무료 판정은 `04_view_derived.sql`의 `plan_status` **하나뿐이다.**
+  하위 뷰에서 다시 정의하지 않는다.
+- `contract_type_refine`은 계약기간 표현 전용이다. 유료 판정에 쓰지 않는다.
 
 ## 관련 정책
 
-- `../policy/` <!-- TODO: 이 작업장에 걸리는 정책 문서 나열 -->
+- `CLAUDE.md` — 이 작업장의 BigQuery 실행 원칙
+- `../policy/50_bigquery.md`, `../policy/10_naming.md`, `../policy/40_docs.md`
