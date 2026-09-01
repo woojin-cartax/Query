@@ -46,8 +46,7 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 |---|---|---|---|
 | `01_ext_table.sql` | 없음 (삭제) | 외부 테이블 생성/재생성 | 스키마 변경 시 |
 | `02_raw_table.sql` | 없음 (삭제) | 네이티브 테이블 정의 | 컬럼 추가 시 |
-| `03_merge_daily.sql` | (예약쿼리 `update_daily`) | 일별 MERGE 적재 + 로그 | 매일 23:00 KST 자동 |
-| `03b_merge_backfill.sql` | 없음 (삭제) | 수동 소급 적재용 변형 | 누락 발생 시 수동 |
+| `03_merge_daily.sql` | (예약쿼리 `update_daily`) | 일별 MERGE 적재 + 로그. 백필 템플릿 포함 | 매일 23:00 KST 자동 |
 | `04_view_derived.sql` | 없음 (삭제) | 히스토리 뷰 + 파생컬럼 | 파생 추가 시 |
 | `05_view_latest.sql` | 없음 (삭제) | 회사별 최신 1행 뷰 | |
 | `06_monthly_kpi_summary.sql` | 없음 (삭제) | 가입월별 KPI 뷰 | |
@@ -144,6 +143,12 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
   스케줄·실패메일·서비스계정은 건드리지 않고 `params.query`만 바뀐다.
   운영 쿼리이므로 **반영 전에 새 쿼리 탭이나 `bq query`로 수동 1회 실행해 확인한다.**
   MERGE 키가 `(company_code, snapshot_date)`라 멱등하므로 같은 날 여러 번 돌려도 안전하다.
+- **소급 적재(백필)는 `03_merge_daily.sql` 안의 주석 템플릿으로 한다.** 별도 파일을 두지
+  않는다. 예전에 `03b_merge_backfill.sql`로 복제해 뒀더니 하루 만에 드리프트가 났다
+  (`BEGIN`/`EXCEPTION` 개선이 한쪽에만 들어갔고 이력 주석도 갈라졌다).
+  방법은 파일 선두 주석에 있다. 요약하면 콘솔 새 탭에 전문을 복사한 뒤
+  `start_dt` 선언과 `WHERE dt BETWEEN` 줄의 주석을 풀고 실행한다.
+  **예약쿼리 본문은 건드리지 않는다.**
   둘이 어긋나지 않았는지는 아래로 확인한다.
   ```bash
   bq show --format=prettyjson --transfer_config \

@@ -14,6 +14,7 @@
 History
 ====================================
 - ver1.0 20260112 컬럼 1차 확정 @전우진
+- ver1.1 20260804 06/30 ~ 08/03 데이터 누락, 소급 추가
 - ver1.2 20260901 BEGIN/EXCEPTION 도입. 실패해도 FAIL 행이 남고 실패 메일이 온다.
                   updated_rows 채움. 적재 0행은 EMPTY로 구분.
 
@@ -23,6 +24,17 @@ History
 
 
 DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 0 DAY);
+
+/* ── 소급 적재(백필) 방법 ───────────────────────────────────────────────
+   특정 구간을 다시 적재해야 할 때:
+     1) 이 파일 전체를 콘솔 새 쿼리 탭에 복사한다. 예약쿼리 본문은 건드리지 않는다.
+     2) 위의 target_dt 선언을 주석 처리하고 아래 두 줄의 주석을 푼다.
+     3) MERGE 소스의 WHERE 절도 함께 바꾼다 (해당 위치에 대체 줄을 주석으로 달아뒀다).
+   MERGE 키가 (company_code, snapshot_date)라 멱등하므로 여러 번 돌려도 안전하다.
+   ────────────────────────────────────────────────────────────────────── */
+--DECLARE start_dt  DATE DEFAULT DATE('2026-01-26');
+--DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 1 DAY);
+
 DECLARE before_cnt INT64;
 DECLARE after_cnt INT64;
 DECLARE merged_cnt INT64;
@@ -85,6 +97,7 @@ USING (
     CAST(has_sample_position AS BOOL) AS has_sample_position
   FROM `carbiz-6f7fc.signup_90days.ext_signup_90days`
   WHERE dt = target_dt
+  --WHERE dt BETWEEN start_dt AND target_dt   -- 백필 시 위 줄과 교체
 ) S
 ON T.company_code = S.company_code
 AND T.snapshot_date = S.snapshot_date
