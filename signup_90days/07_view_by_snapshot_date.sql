@@ -46,19 +46,8 @@ base AS (
       ELSE 0
     END AS churn_before_activation_flag,
 
-    IF(
-      (
-        v.is_booking_date IS NOT NULL
-        AND v.is_trial_active_flag = 1
-      )
-      OR
-      (
-        v.is_booking_date IS NULL
-        AND v.contract_type_refine IN ('year', 'month')
-      )
-      OR v.subscribe_status = 'subscribe',
-      1, 0
-    ) AS is_paid_flag,
+    /* is_paid_flag / plan_status는 view_signup_90days(04)에서 정의한 것을
+       v.* 로 그대로 상속받는다. 여기서 다시 정의하지 않는다. */
 
     /* 참고용: 회사별 최신 스냅샷 여부(1=최신). 05번 view_latest의 rn과 동일 정의 */
     ROW_NUMBER() OVER (

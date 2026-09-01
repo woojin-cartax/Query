@@ -12,6 +12,36 @@
 
 ---
 
+## 2026-09-01 — 유료 판정 단일화: plan_status 신설, is_paid_cond 제거
+
+유료 판정이 `04`의 `is_paid_cond`와 `05`/`07`의 `is_paid_flag` 두 벌로 나뉘어 서로 다른
+조건을 쓰고 있었다. 요금제 기준 단일 판정 `plan_status`(free/trial/paid)를 `04`에 신설하고
+`is_paid_flag`를 여기서만 정의해 하위 뷰가 상속하도록 바꿨다.
+
+판정 규칙 (BigQuery 실측으로 6개 조합 전수 확인):
+- `pricing_plan = 'FREE'` -> free. 체험 플래그 무시.
+  FREE + 체험중 108개사는 전부 `user_count = 0`인 탈퇴/미개통 계정이며 실제 체험이 아니다.
+- 그 외 요금제(PLUS/PREMIUM)는 `is_trial_active` 참이면 trial, 아니면 paid.
+  PLUS + 체험중 2개사(`contract_period = '무료체험'`)가 실재하므로 premium 한정은 쓸 수 없다.
+- `contract_period` / `contract_type` 파싱은 유료 판정에서 완전히 제외.
+
+발견한 것:
+- `pricing_plan` 실제 값은 대문자 `FREE`/`PLUS`/`PREMIUM`이다. 기존 `04`의
+  `pricing_plan = 'premium'` 비교문은 한 번도 참이 된 적 없는 죽은 코드였고,
+  `is_paid_cond`의 `COALESCE(pricing_plan,'free') != 'free'` 조건은 FREE 요금제를
+  전부 유료로 판정하고 있었다. 이 값을 먹는 `days_since_paid`가 오염돼 있었다.
+- 대시보드 KPI(`06`)는 `05`의 `is_paid_flag`를 쓰므로 전환율 자체는 오염되지 않았다.
+  다만 `06` 안에서 `paid_count`(=494)와 `paid_conversion_rate`의 분자(=496)가
+  서로 다른 기준이었다. 이제 둘 다 496으로 일치한다.
+
+영향:
+- `paid_conversion_rate` 불변 (496/2399). 구/신 유료 판정은 기업 단위로 100% 일치함을 대조 확인.
+- `paid_count`/`paid_ratio` 494 -> 496.
+- `days_since_paid` 값이 크게 바뀐다. 유료 도달 기업만 값이 생긴다.
+- `is_paid_cond` 컬럼 소멸. Looker에서 이 필드를 참조 중이면 깨진다. 배포 전 확인 필요.
+
+미배포. BigQuery에는 아직 반영하지 않았다.
+
 ## 2026-09-01 — BigQuery 실행 원칙을 작업장 규칙으로 명문화
 
 `gcloud`/`bq` CLI를 붙이면서 에이전트가 BigQuery를 직접 실행할 수 있게 됐다.

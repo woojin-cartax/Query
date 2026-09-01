@@ -71,10 +71,12 @@ WITH base AS (
       ELSE NULL
     END AS subscribe_status,
 
-    /* 1) 계약타입 : year, month, free, trial */
+    /* 1) 계약기간 구분 : year, month, free, trial
+       주의: 유료/체험 판정은 아래 plan_status가 담당한다.
+             이 컬럼은 계약기간 표현 전용이며 판정에 쓰지 않는다.
+       (기존의 `pricing_plan = 'premium'` 분기는 실제 값이 대문자 'PREMIUM'이라
+        한 번도 참이 된 적 없는 죽은 코드였으므로 제거함) */
     CASE
-      /* Premium 요금제 + 체험중이면 Premium이 아니라 Trial로 분석 */
-      WHEN r.pricing_plan = 'premium' AND r.is_trial_active = TRUE THEN 'trial'
       WHEN REGEXP_CONTAINS(r.contract_period, r'무료') THEN 'trial'
       WHEN REGEXP_CONTAINS(r.contract_period, r'12') THEN 'year'
       WHEN REGEXP_CONTAINS(r.contract_period, r'1') THEN 'month'
@@ -82,6 +84,18 @@ WITH base AS (
       WHEN r.contract_period IS NULL OR TRIM(r.contract_period) = '' THEN 'free'
       ELSE 'free'
     END AS contract_type_refine,
+
+    /* 요금제 상태 — free / trial / paid 단일 판정. 상호배타이며 합이 전체와 일치한다.
+       - pricing_plan 실제 값은 대문자 FREE / PLUS / PREMIUM 3종
+       - FREE는 is_trial_active와 무관하게 free.
+         FREE + 체험중 조합은 user_count=0인 탈퇴/미개통 계정에서 체험 플래그가
+         참으로 남은 것이지 실제 체험이 아니다.
+       - PLUS/PREMIUM은 체험중이면 trial, 아니면 paid */
+    CASE
+      WHEN r.pricing_plan IS NULL OR UPPER(TRIM(r.pricing_plan)) = 'FREE' THEN 'free'
+      WHEN COALESCE(r.is_trial_active, FALSE) THEN 'trial'
+      ELSE 'paid'
+    END AS plan_status,
 
     /* 2) 초기 5회 평균 운행거리 */
     SAFE_DIVIDE(r.first_5_trips_distance, LEAST(r.trip_count_total, 5)) AS avg_distance_first_5_trips,
@@ -152,28 +166,19 @@ WITH base AS (
   FROM `carbiz-6f7fc.signup_90days.raw_signup_90days` r
 ),
 
-/* ✅ 여기서부터 추가: 유료판정 + 최초 유료 snapshot_date */
+/* 유료판정 + 최초 유료 snapshot_date
+   판정 기준은 plan_status 하나뿐이다. 05/07은 여기서 만든 is_paid_flag를
+   그대로 상속받아 쓰며, 각자 다시 정의하지 않는다. */
 paid AS (
   SELECT
     b.*,
 
-    /* 유료 판정(요청 3조건) */
-    (
-      (b.is_trial_active = TRUE AND b.is_booking_date IS NOT NULL) OR
-      (b.contract_type_refine IN ('year','month')) OR
-      (b.is_trial_active = FALSE AND COALESCE(b.pricing_plan, 'free') != 'free')
-    ) AS is_paid_cond,
+    /* 유료 여부 (Looker SUM용 0/1) */
+    IF(b.plan_status = 'paid', 1, 0) AS is_paid_flag,
 
     /* 회사별 최초 유료 스냅샷일 */
-    MIN(
-      IF(
-        (b.is_trial_active = TRUE AND b.is_booking_date IS NOT NULL) OR
-        (b.contract_type_refine IN ('year','month')) OR
-        (b.is_trial_active = FALSE AND COALESCE(b.pricing_plan, 'free') != 'free'),
-        b.snapshot_date,
-        NULL
-      )
-    ) OVER (PARTITION BY b.company_code) AS paid_first_snapshot_date
+    MIN(IF(b.plan_status = 'paid', b.snapshot_date, NULL))
+      OVER (PARTITION BY b.company_code) AS paid_first_snapshot_date
 
   FROM base b
 ),
