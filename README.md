@@ -116,7 +116,21 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
   스냅샷을 전량 삭제한다. 복구는 GCS 원본으로부터 전량 재머지뿐이다.
   `signup_2025/80_year_merge.sql`도 같다.
 - **`03_merge_daily.sql`은 예약쿼리 실물의 사본이다.** 파일을 고쳐도 예약쿼리는
-  바뀌지 않는다. 콘솔의 `update_daily`를 직접 수정해야 반영된다.
+  바뀌지 않는다. 반영하려면 아래처럼 파일을 그대로 밀어넣는다. 콘솔 복붙보다
+  안전하다 — 오타나 잘림이 원천 차단되고 바이트 단위로 일치한다.
+  ```bash
+  python3 - <<'EOF'
+  import json, subprocess, io
+  CFG = "projects/975350524805/locations/asia-northeast3/transferConfigs/697bce99-0000-2450-996f-089e082437ec"
+  sql = io.open("signup_90days/03_merge_daily.sql", encoding="utf-8").read()
+  # shell을 거치지 않는다. SQL 안의 백틱이 명령치환으로 해석되는 사고를 막는다.
+  subprocess.run(["bq", "update", "--transfer_config",
+                  f"--params={json.dumps({'query': sql})}", CFG], check=True)
+  EOF
+  ```
+  스케줄·실패메일·서비스계정은 건드리지 않고 `params.query`만 바뀐다.
+  운영 쿼리이므로 **반영 전에 새 쿼리 탭이나 `bq query`로 수동 1회 실행해 확인한다.**
+  MERGE 키가 `(company_code, snapshot_date)`라 멱등하므로 같은 날 여러 번 돌려도 안전하다.
   둘이 어긋나지 않았는지는 아래로 확인한다.
   ```bash
   bq show --format=prettyjson --transfer_config \
