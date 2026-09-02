@@ -170,8 +170,19 @@ WITH base AS (
     IFNULL(CAST(is_trial_active AS INT64), 0) AS is_trial_active_flag,
     IFNULL(CAST(has_app_login AS INT64), 0) AS has_app_login_flag,
 
-    /* 테스트 계정 여부 */
-    REGEXP_CONTAINS(CONCAT(IFNULL(r.company_name,''), ' ', IFNULL(r.company_code,'')), r'(영티포|카택스|테스트|4424|유진의|조훈)') AS is_test_account,
+    /* 테스트 계정 여부.
+       회사명과 회사코드를 이어붙여 키워드로 판정한다.
+       회사명은 company_name_norm과 같은 방식으로 정규화한다 — 전각/공백 변형으로
+       키워드를 빠져나가는 것을 막기 위해서다. (2026-09-02 기준 정규화 전후 판정 결과는
+       동일하다. 앞으로 `카 택 스`처럼 공백이 낀 이름이 들어올 때를 위한 방어다.) */
+    REGEXP_CONTAINS(
+      CONCAT(
+        REGEXP_REPLACE(LOWER(NORMALIZE(IFNULL(r.company_name, ''), NFKC)), r'\s+', ''),
+        ' ',
+        LOWER(IFNULL(r.company_code, ''))
+      ),
+      r'(영티포|카택스|테스트|4424|유진의|조훈|낙현회사|퍼피또리)'
+    ) AS is_test_account,
 
     /* 업체관리 페이지 링크 */
     CONCAT('https://cds.carbeast.co.kr/admin/companyManager.php?service=biz&seq=', r.sequence_id) AS company_admin_url,
