@@ -18,6 +18,11 @@ CREATE OR REPLACE VIEW `carbiz-6f7fc.signup_90days.view_signup_90days_by_snapsho
    그 외는 동일하게 유지한다. 한쪽만 고치지 않는다.
 
    파생컬럼은 전부 04에서 만들어 상속받는다. 여기서 다시 정의하지 않는다.
+
+   [주의] 2026-07-29 스냅샷은 소급 적재분이라 당시 상태가 아니다.
+   원본이 2026-09-02에 재생성됐고, 수집 원본은 가입 후 90일 이내 기업만 담으므로
+   재생성 시점에 이미 90일이 지난 기업은 빠져 있다. 672행으로 인접일보다 70여 건 적다.
+   그날의 전체 현황으로 읽으면 안 된다.
 ========================= */
 
 WITH snapshot_rows AS (
@@ -48,6 +53,13 @@ dedup_flagged AS (
       PARTITION BY dedup.snapshot_date, dedup.company_name_norm
     ) AS paid_account_count,
 
+
+    /* 실사용 중인 무료·체험 계정인가.
+       최근 2주 운행이 14회 이상, 즉 하루 최소 1회. 유료 계정과 같은 이름으로 묶였더라도
+       실제로 쓰고 있으면 별개 기업으로 인정한다.
+       06_monthly_base와 같은 기준이다. 두 뷰의 중복 규칙은 반드시 같아야 한다. */
+    IF(dedup.is_paid_flag = 0 AND dedup.trip_count_recent_2w >= 14, 1, 0) AS is_active_free,
+
     /* 정렬키 동점 시 company_code로 결정적 tiebreak. 근거는 05_view_latest.sql 참조 */
     ROW_NUMBER() OVER (
       PARTITION BY dedup.snapshot_date, dedup.company_name_norm
@@ -71,7 +83,7 @@ SELECT
 
   CASE
     WHEN paid_account_count >= 2 THEN TRUE
-    WHEN paid_account_count = 1 THEN dedup_flagged.is_paid_flag = 1
+    WHEN paid_account_count = 1 THEN (dedup_flagged.is_paid_flag = 1 OR dedup_flagged.is_active_free = 1)
     ELSE dedup_flagged.duplicate_keep_rank = 1
   END AS duplicate_keep_flag,
 
@@ -83,7 +95,7 @@ SELECT
     WHEN dedup_flagged.manual_override = 'exclude' THEN TRUE
     WHEN dedup_flagged.manual_override = 'keep'    THEN FALSE
     WHEN paid_account_count >= 2 THEN FALSE
-    WHEN paid_account_count = 1 THEN dedup_flagged.is_paid_flag = 0
+    WHEN paid_account_count = 1 THEN NOT (dedup_flagged.is_paid_flag = 1 OR dedup_flagged.is_active_free = 1)
     ELSE dedup_flagged.duplicate_keep_rank > 1
   END AS duplicate_exclude_flag
 

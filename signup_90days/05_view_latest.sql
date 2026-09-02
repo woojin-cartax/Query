@@ -40,6 +40,13 @@ dedup_flagged AS (
     /* 동일 회사명 중 유료 계정 수 */
     SUM(dedup.is_paid_flag) OVER (PARTITION BY dedup.company_name_norm) AS paid_account_count,
 
+
+    /* 실사용 중인 무료·체험 계정인가.
+       최근 2주 운행이 14회 이상, 즉 하루 최소 1회. 유료 계정과 같은 이름으로 묶였더라도
+       실제로 쓰고 있으면 별개 기업으로 인정한다.
+       06_monthly_base와 같은 기준이다. 두 뷰의 중복 규칙은 반드시 같아야 한다. */
+    IF(dedup.is_paid_flag = 0 AND dedup.trip_count_recent_2w >= 14, 1, 0) AS is_active_free,
+
     /* 동일 회사명 중 유지 우선순위: 차량수 > 운행수 > 누적운행거리 > 사용자수
        마지막 company_code는 동점 시 결정적 tiebreak다. 활동량이 전부 0인 빈 계정끼리
        같은 회사명으로 묶이면 정렬키 4개가 모두 동점이 되어 ROW_NUMBER의 순위가
@@ -67,7 +74,7 @@ SELECT
 
   CASE
     WHEN paid_account_count >= 2 THEN TRUE
-    WHEN paid_account_count = 1 THEN dedup_flagged.is_paid_flag = 1
+    WHEN paid_account_count = 1 THEN (dedup_flagged.is_paid_flag = 1 OR dedup_flagged.is_active_free = 1)
     ELSE dedup_flagged.duplicate_keep_rank = 1
   END AS duplicate_keep_flag,
 
@@ -79,7 +86,7 @@ SELECT
     WHEN dedup_flagged.manual_override = 'exclude' THEN TRUE
     WHEN dedup_flagged.manual_override = 'keep'    THEN FALSE
     WHEN paid_account_count >= 2 THEN FALSE
-    WHEN paid_account_count = 1 THEN dedup_flagged.is_paid_flag = 0
+    WHEN paid_account_count = 1 THEN NOT (dedup_flagged.is_paid_flag = 1 OR dedup_flagged.is_active_free = 1)
     ELSE dedup_flagged.duplicate_keep_rank > 1
   END AS duplicate_exclude_flag
 
