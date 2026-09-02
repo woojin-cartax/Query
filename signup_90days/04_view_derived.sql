@@ -182,7 +182,17 @@ WITH base AS (
         LOWER(IFNULL(r.company_code, ''))
       ),
       r'(영티포|카택스|테스트|4424|유진의|조훈|낙현회사|퍼피또리)'
-    ) AS is_test_account,
+    )
+    /* 수동으로 테스트 지정한 계정을 보탠다. 정규식이 놓친 것을 사람이 채운다.
+       COALESCE가 필요하다. mo.override가 NULL이면 `FALSE OR NULL`이 FALSE가 아니라
+       NULL이 되어(SQL 3값 논리) 수동 판정이 없는 계정까지 판정 불가가 된다. */
+    OR COALESCE(mo.override, '') = 'test'
+    AS is_test_account,
+
+    /* 수동 판정 값을 그대로 노출한다. 05 / 06 / 07이 중복 판정에서 쓴다.
+       test / exclude / keep 중 하나이거나 NULL. */
+    mo.override AS manual_override,
+    mo.reason   AS manual_override_reason,
 
     /* 업체관리 페이지 링크 */
     CONCAT('https://cds.carbeast.co.kr/admin/companyManager.php?service=biz&seq=', r.sequence_id) AS company_admin_url,
@@ -200,6 +210,10 @@ WITH base AS (
       OVER (PARTITION BY r.company_code) AS is_churned_date
 
   FROM `carbiz-6f7fc.signup_90days.raw_signup_90days` r
+  /* 수동 판정. 데이터만으로 가릴 수 없는 것을 사람이 정해둔 목록이다.
+     목록과 규칙은 00_manual_override.sql에 있다. */
+  LEFT JOIN `carbiz-6f7fc.signup_90days.manual_override` mo
+    ON mo.company_code = r.company_code
 ),
 
 /* 유료판정 + 최초 유료 snapshot_date

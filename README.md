@@ -47,6 +47,7 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 
 | 파일 | 콘솔 저장쿼리 | 역할 | 갱신 |
 |---|---|---|---|
+| `00_manual_override.sql` | 없음 | 수동 판정 목록. 데이터로 못 가리는 판단을 사람이 기록 | 판단이 생길 때 |
 | `01_ext_table.sql` | 없음 (삭제) | 외부 테이블 생성/재생성 | 스키마 변경 시 |
 | `02_raw_table.sql` | 없음 (삭제) | 네이티브 테이블 정의 | 컬럼 추가 시 |
 | `03_merge_daily.sql` | (예약쿼리 `update_daily`) | 일별 MERGE 적재 + 로그. 백필 템플릿 포함 | 매일 23:00 KST 자동 |
@@ -172,6 +173,10 @@ bq query --use_legacy_sql=false < signup_90days/04_view_derived.sql
 - **회사명 정규화는 `NORMALIZE(NFKC)`를 먼저 건다.** 실제 데이터에 전각 괄호가 섞여
   있어(`（주）` 등 55건) 반각만 열거하면 그 회사들이 정규화에서 빠져나간다.
   NFKC가 전각→반각, `㈜`→`(주)`를 한 번에 처리한다.
+- **자동 판정이 틀렸을 때는 `00_manual_override.sql`에 적는다.** 데이터만으로는 가릴 수
+  없는 경우가 있다. 예를 들어 사내 테스트 계정이 실제로 운행 기록을 남기면 실사용 예외
+  규칙에 걸려 살아남는다. 파일에 한 줄 넣고 그 파일만 실행하면 되며 뷰 재배포는 필요 없다.
+  **반드시 `reason`을 적는다.** 근거 없는 수동 판정은 나중에 아무도 못 고친다.
 - **`06_monthly_base`의 중복 판정은 `05`/`07`과 다르다.** 모집단이 "기준일 이하 전체
   기록에서 회사코드별 마지막 관측 행"이다. raw가 가입 후 90일까지만 쌓이므로,
   그 시점 스냅샷만 보면 같은 회사인데 일부 계정이 안 보인 채로 판정하게 되기 때문이다.
@@ -203,7 +208,9 @@ WHERE ref_month = '2026-07' AND signup_year_month = ref_month
 ORDER BY exclude_reason, company_name_norm, duplicate_keep_rank;
 ```
 
-`exclude_reason`은 `test` / `withdrawn` / `duplicate` 중 하나다. 같은 이름 그룹이
+`exclude_reason`은 `test` / `withdrawn` / `manual` / `duplicate` 중 하나다.
+`manual`은 사람이 `00_manual_override.sql`에 직접 적어 뺀 경우다.
+수동으로 테스트 지정한 계정은 `test`로 찍힌다. 같은 이름 그룹이
 나란히 나오므로 왜 빠졌는지 바로 보인다.
 
 ## 알아둘 객체

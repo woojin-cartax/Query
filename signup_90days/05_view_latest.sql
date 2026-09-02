@@ -71,7 +71,13 @@ SELECT
     ELSE dedup_flagged.duplicate_keep_rank = 1
   END AS duplicate_keep_flag,
 
+  /* 자동 중복 판정 위에 수동 판정을 얹는다.
+       manual_override = 'exclude' -> 무조건 제외
+       manual_override = 'keep'    -> 중복 제외를 되살림
+     규칙과 우선순위는 00_manual_override.sql 참조. */
   CASE
+    WHEN dedup_flagged.manual_override = 'exclude' THEN TRUE
+    WHEN dedup_flagged.manual_override = 'keep'    THEN FALSE
     WHEN paid_account_count >= 2 THEN FALSE
     WHEN paid_account_count = 1 THEN dedup_flagged.is_paid_flag = 0
     ELSE dedup_flagged.duplicate_keep_rank > 1

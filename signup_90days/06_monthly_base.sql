@@ -86,6 +86,8 @@ judged AS (
          2) 유료 1개                       -> 유료 계정 + 실사용 중인 무료·체험 계정만 유지
          3) 유료 0개                       -> 활동량 1위만 유지 */
     CASE
+      WHEN f.manual_override = 'exclude' THEN TRUE
+      WHEN f.manual_override = 'keep'    THEN FALSE
       WHEN f.paid_account_count >= 2 THEN FALSE
       WHEN f.paid_account_count = 1 THEN NOT (f.is_paid_flag = 1 OR f.is_active_free = 1)
       ELSE f.duplicate_keep_rank > 1
@@ -99,10 +101,14 @@ SELECT
   j.duplicate_exclude_flag,
 
   /* 집계 대상 여부와 제외 사유. 제외된 기업 목록은 exclude_reason으로 뽑는다.
-     사유가 겹칠 때는 심각한 순서(테스트 > 탈퇴 > 중복)로 하나만 남긴다. */
+     사유가 겹칠 때는 우선순위대로 하나만 남긴다.
+       test > withdrawn > manual > duplicate
+     manual은 사람이 00_manual_override.sql에 직접 적어 뺀 경우다.
+     수동 test 지정은 is_test_account에 이미 반영돼 test로 찍힌다. */
   CASE
     WHEN j.is_test_account THEN 'test'
     WHEN j.is_withdrawn_company THEN 'withdrawn'
+    WHEN j.manual_override = 'exclude' THEN 'manual'
     WHEN j.duplicate_exclude_flag THEN 'duplicate'
     ELSE NULL
   END AS exclude_reason,
