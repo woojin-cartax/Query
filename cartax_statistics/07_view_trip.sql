@@ -30,7 +30,7 @@ SELECT
   t.gps_distance,
   t.connected_car_distance,
   t.driving_time,
-  t.purpose_name,
+  t.purpose_code,        -- 코드 그대로. 이름 해석은 purpose 테이블이 와야 한다
   t.driving_type,
   t.approval_status,
   t.app_version,

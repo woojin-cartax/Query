@@ -236,3 +236,24 @@ SELECT
   MAX(depth)                                        AS max_depth,
   APPROX_QUANTILES(depth, 4)                        AS depth_quartiles
 FROM `carbiz-6f7fc.cartax_statistics.raw_department`;
+
+
+/* ── 16. purpose_code 가 무엇과 대응하나 ─────────────────────────────
+   drivingLog.purpose 는 varchar(50) 코드다. purpose 테이블에 후보가 셋 있다.
+     purposeCode varchar(20)  운행목적 코드
+     purposeType varchar(20)  운행목적 타입
+     purposeName varchar(20)  운행목적 이름
+   어느 것과 붙는지 확인하기 전에는 이름으로 번역하지 않는다.
+
+   ※ purpose 테이블에 companySeq 가 있다. 같은 코드가 기업마다 다른 뜻일 수
+     있다는 뜻이다. 해석은 반드시 (company_seq, purpose_code) 쌍으로 한다.
+     코드만으로 전사 집계하면 서로 다른 목적이 한 덩어리가 된다.
+
+   purpose 테이블을 아직 반입하지 않아 지금은 분포만 본다. */
+SELECT
+  purpose_code,
+  COUNT(*)                                          AS row_cnt,
+  COUNT(DISTINCT company_seq)                       AS companies
+FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+WHERE trip_date >= '2016-01-01'
+GROUP BY purpose_code ORDER BY row_cnt DESC LIMIT 40;

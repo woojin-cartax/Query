@@ -40,7 +40,7 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trip`
   gps_distance             INT64,
   connected_car_distance   INT64,
   driving_time             FLOAT64,
-  purpose_name             STRING,
+  purpose_code             STRING,   -- 코드. 이름은 purpose 테이블에 있다 (미반입)
   is_auto_start            BOOL,
   driving_type             STRING,
   is_admin_created         BOOL,

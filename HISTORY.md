@@ -80,6 +80,14 @@ id(`company.cid`)다. 일반 사용자 로그인이 아니다. `login_pc` → `l
 language·device_model)와 `raw_trip` 의 app_version 까지 같이 지워졌다. 컬럼 순서
 정적 대조에서 잡아 복구했다. 12개 테이블 불일치 0건 재확인.
 
+`drivingLog.purpose` 별칭을 `purpose_name` → **`purpose_code`** 로 고쳤다.
+varchar(50) 코드인데 이름처럼 불러 두면 그대로 라벨로 쓰다가 틀린다.
+`purpose` 테이블에 후보가 셋(`purposeCode`/`purposeType`/`purposeName`) 있고 어느
+것과 붙는지 확인되지 않았다. 그 테이블에 `companySeq` 가 있다는 점이 중요하다 —
+같은 코드가 기업마다 다른 뜻일 수 있어 해석은 `(company_seq, purpose_code)` 쌍으로
+해야 하고, 코드만으로 전사 집계하면 서로 다른 목적이 한 덩어리가 된다.
+`90_check.sql` 16번에 분포 확인을 넣었다.
+
 `payment.memo`(해지 사유 후보)는 보류. 나중에 값을 확인한다.
 
 테이블 12개 전부 DDL 과 추출 쿼리의 컬럼 이름·순서 일치 확인. 드라이런 통과.

@@ -71,7 +71,7 @@ BEGIN
     department_seq = S.department_seq, trip_date = S.trip_date, start_time = S.start_time, stop_time = S.stop_time,
     distance = S.distance, gps_distance = S.gps_distance,
     connected_car_distance = S.connected_car_distance, driving_time = S.driving_time,
-    purpose_name = S.purpose_name, is_auto_start = S.is_auto_start,
+    purpose_code = S.purpose_code, is_auto_start = S.is_auto_start,
     driving_type = S.driving_type, is_admin_created = S.is_admin_created,
     approval_status = S.approval_status, is_deleted = S.is_deleted,
     is_merge_parent = S.is_merge_parent, merge_parent_seq = S.merge_parent_seq,

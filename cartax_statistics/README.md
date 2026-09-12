@@ -188,6 +188,12 @@ X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적
   파티션·클러스터 판단이 달라진다. `90_check.sql` 10번.
 - **`loginBrowserHistory.parent`** varchar(45), 주석 없음. 의미 미확인이라 뺐다.
 - **`payment.type`** 샘플이 전부 `'SC0999'`. 의미 미확인.
+- **`purpose_code` 의 해석.** `drivingLog.purpose` 는 이름이 아니라 코드다.
+  `purpose` 테이블(11컬럼, 시트에 있음)에 후보가 셋이다 —
+  `purposeCode` / `purposeType` / `purposeName`. 어느 것과 붙는지 미확인.
+  **그 테이블에 `companySeq` 가 있다.** 같은 코드가 기업마다 다른 뜻일 수 있으니
+  해석은 `(company_seq, purpose_code)` 쌍으로 해야 한다. 코드만으로 전사 집계하면
+  서로 다른 목적이 한 덩어리가 된다. `90_check.sql` 16번.
 - **`createTime` 신뢰 구간.** `payment` seq 1~10 의 `createTime` 이 전부
   `2017-05-15 19:48:10` 인데 `beginDate` 는 2016년이다. 그 시점에 데이터를 이관한
   흔적이다. 이전 행의 `createTime` 은 생성 시각이 아니다. `90_check.sql` 7번.

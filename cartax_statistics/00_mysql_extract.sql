@@ -254,7 +254,7 @@ SELECT
     gpsDistance                       AS gps_distance,       -- >0 이면 GPS 실운행. 수기 입력과 가른다
     hyundaiDistance                   AS connected_car_distance,
     drivingTime                       AS driving_time,
-    purpose                           AS purpose_name,
+    purpose                           AS purpose_code,     -- 코드다. 이름이 아니다. purpose 테이블로 해석한다
     (autoStart = 'Y')                 AS is_auto_start,      -- 자동 운행
     drivingType                       AS driving_type,       -- 수동 / 비콘 / 블루투스 / 전원
     (isAdminCreated = 'Y')            AS is_admin_created,   -- 관리자가 만든 운행 ↔ 직원 운행
