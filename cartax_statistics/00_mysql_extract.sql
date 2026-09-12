@@ -181,11 +181,11 @@ WHERE updateTime >= :from AND updateTime < :to;
      autoStartMessage, autoStopMessage, autoApproval, sort, marketer,
      corporateDocName, logoEnabled, licenceReceipt, licenceOil
 
-   [설정 18개를 받는 이유]
-     선별 기준 4(쓸 분석 없으면 받지 않는다)에 걸리는 것처럼 보이나,
-     기준의 예외인 「되돌릴 수 없는 것」에 해당한다. 설정값은 현재 상태만 있고
-     변경 이력이 어디에도 남지 않는다. 오늘 안 받으면 어제 값은 영영 사라진다.
-     기업은 2.5만 행이라 용량 부담이 없다.
+   [설정은 두 개만 받는다]
+     lockSaveMapPoint  경로 저장 범위 (A전체 / Y출도착 / N선택 / X미저장 / C차량별)
+     privacyMode       사생활 보호 (none / user / car / all)
+     둘 다 「수집하는 데이터의 양 자체」를 정하는 설정이라, 운행 데이터가 왜
+     비어 있는지를 설명한다. 나머지 16개는 쓸 분석이 없어 뺐다 (선별 기준 4).
    ------------------------------------------------------------------------- */
 SELECT
     seq                               AS company_seq,
@@ -205,27 +205,9 @@ SELECT
     SUBSTRING_INDEX(email, '@', -1)   AS email_domain,       -- 전체 주소 아님. 도메인만
     SUBSTRING_INDEX(address, ' ', 2)  AS address_region,     -- 시/도 + 시/군/구 까지만
     smsCnt                            AS invite_sms_count,
-    defaultOilMileage                 AS default_oil_mileage,
-    defaultPurpose                    AS default_purpose,
-    -- 설정 (제품 활용 깊이 지표)
-    individualAuth                    AS setting_individual_auth,
-    corporationAuth                   AS setting_corporation_auth,
-    lockDeviceChange                  AS setting_lock_device_change,
-    timeBlind                         AS setting_time_blind,
-    noWorkBlind                       AS setting_no_work_blind,
-    lockDate                          AS setting_lock_date,
-    lockTime                          AS setting_lock_time,
-    lockDistance                      AS setting_lock_distance,
-    lockTotalDistance                 AS setting_lock_total_distance,
+    -- 설정 — 수집 범위를 정하는 둘만
     lockSaveMapPoint                  AS setting_save_map_point,   -- A전체 Y출도착 N선택 X미저장 C차량별
-    isOtherDrivingAuth                AS setting_other_driving_auth,
     privacyMode                       AS setting_privacy_mode,     -- none / user / car / all
-    userJoinEmail                     AS setting_user_join_email,
-    deviceChangeEmail                 AS setting_device_change_email,
-    denyWeeklyReport                  AS setting_deny_weekly_report,
-    changeModal                       AS setting_upgrade_modal,
-    isDisabledAutoAuth                AS setting_auto_auth_disabled,
-    insuranceAdsAgreement             AS setting_insurance_ads_agree,
     updateTime                        AS updated_at
 FROM company
 WHERE updateTime >= :from AND updateTime < :to;

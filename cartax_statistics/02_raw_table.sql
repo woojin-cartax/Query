@@ -230,26 +230,8 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company`
   email_domain                   STRING,   -- 도메인만. 주소 전체는 수집하지 않는다
   address_region                 STRING,   -- 시/도 + 시/군/구 까지만
   invite_sms_count               INT64,
-  default_oil_mileage            NUMERIC,
-  default_purpose                STRING,
-  setting_individual_auth        STRING,
-  setting_corporation_auth       STRING,
-  setting_lock_device_change     STRING,
-  setting_time_blind             STRING,
-  setting_no_work_blind          STRING,
-  setting_lock_date              STRING,
-  setting_lock_time              STRING,
-  setting_lock_distance          STRING,
-  setting_lock_total_distance    STRING,
   setting_save_map_point         STRING,
-  setting_other_driving_auth     STRING,
   setting_privacy_mode           STRING,
-  setting_user_join_email        STRING,
-  setting_device_change_email    STRING,
-  setting_deny_weekly_report     STRING,
-  setting_upgrade_modal          STRING,
-  setting_auto_auth_disabled     STRING,
-  setting_insurance_ads_agree    STRING,
   updated_at                     DATETIME,
   loaded_at                      TIMESTAMP
 )

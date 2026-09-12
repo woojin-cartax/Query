@@ -206,7 +206,7 @@ X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적
 | `drivingLog` → `trip` | 60 | 29 | 주소·좌표·성명·메모(개인정보), 안전운전 지표(쓸 분석 없음) |
 | `user` | 42 | 13 | 기기·OS·언어·권한 세부·커넥티드카(쓸 분석 없음), 성명·이메일·토큰(개인정보) |
 | `department` | 11 | 6 | 부서명(어느 집계에도 안 들어감 + 「홍길동팀」 위험) |
-| `company` | 56 | 38 | 인증·성명·연락처·미사용 표시 컬럼 |
+| `company` | 56 | 20 | 인증·성명·연락처·미사용 컬럼, 설정 16개(쓸 분석 없음) |
 
 추출 쿼리 주석에 테이블별로 무엇을 왜 뺐는지 적어 두었다.
 
@@ -225,6 +225,17 @@ X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적
 | 사용자 이메일 (`user.email`) | 도메인만 (포털/회사 도메인 구분용) |
 | 워크플레이스 식별자 (`user.wp_login_id`, `wp_emp_id`) | 제외 |
 | 부서명 (`department.name`, `fullName`) | 제외 |
+
+`company` 의 설정은 **둘만 받는다.**
+
+| 컬럼 | 값 | 왜 남겼나 |
+|---|---|---|
+| `setting_save_map_point` | A전체 / Y출도착 / N선택 / X미저장 / C차량별 | `X` 면 경로가 아예 안 남는다 |
+| `setting_privacy_mode` | none / user / car / all | `none` 이 아니면 운행이 가려진다 |
+
+둘 다 **수집되는 데이터의 양 자체**를 정하는 설정이다. 이걸 모르고 「운행이 적다」고
+읽으면 사용 부진으로 오진한다. `06_view_company.sql` 의 `has_restricted_logging` 이
+그 구분이다. 나머지 16개 설정은 쓸 분석이 없어 뺐다.
 | 로그인 IP (`loginBrowserHistory.clientIp`) | 제외 (암호화돼 있어도 쓸 분석이 없다) |
 | userAgent raw (`loginBrowserHistory.userAgent`) | 제외 (platform/browser/version 으로 파싱돼 있다) |
 

@@ -92,30 +92,18 @@ SELECT
   (s.trial_cancel_date IS NOT NULL)               AS has_cancelled_trial,
 
   /* ── 설정 ─────────────────────────────────────────────────────────
-     기본값에서 바꾼 설정의 개수. 제품에 얼마나 손을 댔는지의 대리 지표다.
-     아직 검증된 가설이 아니다 — 이탈·전환과 상관이 있는지 확인해야 한다.      */
-  (
-    IF(c.setting_individual_auth     != 'N',    1, 0) +
-    IF(c.setting_corporation_auth    != 'Y',    1, 0) +
-    IF(c.setting_lock_device_change  != 'Y',    1, 0) +
-    IF(c.setting_time_blind          != 'N',    1, 0) +
-    IF(c.setting_no_work_blind       != 'N',    1, 0) +
-    IF(c.setting_lock_date           != 'N',    1, 0) +
-    IF(c.setting_lock_time           != 'N',    1, 0) +
-    IF(c.setting_lock_distance       != 'N',    1, 0) +
-    IF(c.setting_lock_total_distance != 'N',    1, 0) +
-    IF(c.setting_save_map_point      != 'Y',    1, 0) +
-    IF(c.setting_other_driving_auth  != 'Y',    1, 0) +
-    IF(c.setting_privacy_mode        != 'none', 1, 0) +
-    IF(c.setting_user_join_email     != 'Y',    1, 0) +
-    IF(c.setting_device_change_email != 'Y',    1, 0) +
-    IF(c.setting_deny_weekly_report  != 'N',    1, 0) +
-    IF(c.setting_auto_auth_disabled  != 'N',    1, 0) +
-    IF(c.setting_insurance_ads_agree != 'N',    1, 0)
-  )                                               AS settings_changed_count,
-
-  c.setting_privacy_mode,
+     둘만 받는다. 둘 다 「수집하는 데이터의 양 자체」를 정하는 설정이라,
+     운행 데이터가 왜 비어 있는지를 설명한다.
+       setting_save_map_point  X미저장이면 경로가 아예 안 남는다
+       setting_privacy_mode    none 이 아니면 운행이 가려진다
+     이걸 모르고 「운행이 적다」고 읽으면 사용 부진으로 오진한다. */
   c.setting_save_map_point,
+  c.setting_privacy_mode,
+
+  /* 운행 기록이 구조적으로 제한돼 있나. 사용 부진과 구분해야 한다 */
+  (c.setting_save_map_point = 'X' OR c.setting_privacy_mode != 'none')
+                                                  AS has_restricted_logging,
+
   c.updated_at
 FROM `carbiz-6f7fc.cartax_statistics.raw_company` c
 LEFT JOIN `carbiz-6f7fc.cartax_statistics.raw_company_pay_state` s

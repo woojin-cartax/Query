@@ -192,23 +192,8 @@ BEGIN
     join_device = S.join_device, coalition_company = S.coalition_company,
     ga_client_id = S.ga_client_id, email_domain = S.email_domain,
     address_region = S.address_region, invite_sms_count = S.invite_sms_count,
-    default_oil_mileage = S.default_oil_mileage, default_purpose = S.default_purpose,
-    setting_individual_auth = S.setting_individual_auth,
-    setting_corporation_auth = S.setting_corporation_auth,
-    setting_lock_device_change = S.setting_lock_device_change,
-    setting_time_blind = S.setting_time_blind, setting_no_work_blind = S.setting_no_work_blind,
-    setting_lock_date = S.setting_lock_date, setting_lock_time = S.setting_lock_time,
-    setting_lock_distance = S.setting_lock_distance,
-    setting_lock_total_distance = S.setting_lock_total_distance,
     setting_save_map_point = S.setting_save_map_point,
-    setting_other_driving_auth = S.setting_other_driving_auth,
     setting_privacy_mode = S.setting_privacy_mode,
-    setting_user_join_email = S.setting_user_join_email,
-    setting_device_change_email = S.setting_device_change_email,
-    setting_deny_weekly_report = S.setting_deny_weekly_report,
-    setting_upgrade_modal = S.setting_upgrade_modal,
-    setting_auto_auth_disabled = S.setting_auto_auth_disabled,
-    setting_insurance_ads_agree = S.setting_insurance_ads_agree,
     updated_at = S.updated_at, loaded_at = CURRENT_TIMESTAMP()
   WHEN NOT MATCHED THEN INSERT ROW;
   SET company_cnt = @@row_count;
