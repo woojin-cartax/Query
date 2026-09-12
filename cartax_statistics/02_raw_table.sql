@@ -25,13 +25,14 @@
 
 
 /* ── trip — 운행 원본. 10년 2,500만 행 ─────────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_trip`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_trip`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_trip`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trip`
 (
   trip_id                  INT64    NOT NULL,
   company_seq              INT64,
   vehicle_seq              INT64,
   user_uid                 STRING,
+  department_seq           INT64,
   trip_date                DATE,
   start_time               DATETIME,
   stop_time                DATETIME,
@@ -68,8 +69,8 @@ OPTIONS (
 
 
 /* ── payment — 결제 이력 ──────────────────────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_payment`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_payment`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_payment`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_payment`
 (
   payment_id               INT64    NOT NULL,
   company_seq              INT64,
@@ -100,8 +101,8 @@ OPTIONS (description = '결제 이력. MySQL payment. 1행 = 결제 1건. contra
 
 
 /* ── pay_schedule — 정기결제 예약과 결과. 실패 기록이 여기 있다 ────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_pay_schedule`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_pay_schedule`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_pay_schedule`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_pay_schedule`
 (
   schedule_id              INT64    NOT NULL,
   company_seq              INT64,
@@ -122,8 +123,8 @@ OPTIONS (description = '정기결제 예약·결과. MySQL paySchedule. status=E
 
 
 /* ── company_pay_state — 기업의 현재 결제 상태 (기업당 1행) ───────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_company_pay_state`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_company_pay_state`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_company_pay_state`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company_pay_state`
 (
   pay_state_id             INT64    NOT NULL,
   company_seq              INT64,
@@ -149,8 +150,8 @@ OPTIONS (description = '기업 현재 결제 상태. MySQL companyPayState. 결�
 
 
 /* ── company_pay_state_history — 결제 상태 변경 이력 ──────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_company_pay_state_history`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_company_pay_state_history`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_company_pay_state_history`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company_pay_state_history`
 (
   history_id               INT64    NOT NULL,
   pay_state_id             INT64,
@@ -177,8 +178,8 @@ OPTIONS (description = '결제 상태 변경 이력. MySQL companyPayStateHistor
 
 
 /* ── trial_history — 무료체험 부여 이력 ──────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_trial_history`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_trial_history`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_trial_history`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trial_history`
 (
   trial_id                 INT64    NOT NULL,
   company_seq              INT64,
@@ -195,8 +196,8 @@ OPTIONS (description = '무료체험 부여 이력. MySQL freeExperienceHistory.
 
 
 /* ── trip_deleted — 물리 삭제된 운행의 식별자 ────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_trip_deleted`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_trip_deleted`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_trip_deleted`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trip_deleted`
 (
   trip_id                  INT64    NOT NULL,
   company_seq              INT64,
@@ -209,8 +210,8 @@ OPTIONS (description = '물리 삭제된 운행. MySQL deleteDrivingLog. raw_tri
 
 
 /* ── company — 기업 마스터 (기업당 1행) ──────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_company`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_company`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_company`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company`
 (
   company_seq                    INT64  NOT NULL,
   company_code                   STRING,
@@ -256,13 +257,13 @@ CLUSTER BY company_seq, company_code
 OPTIONS (description = '기업 마스터. MySQL company. 인증정보·성명·연락처·자유입력 메모는 수집하지 않는다. 이메일은 도메인만, 주소는 시군구까지만.');
 
 
-/* ── login_pc — PC·브라우저 로그인 이력 ──────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_login_pc`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_login_pc`
+/* ── login_admin — PC·브라우저 로그인 이력 ──────────────────────────────── */
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_login_admin`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_login_admin`
 (
   login_id                 INT64    NOT NULL,
   company_seq              INT64,
-  company_code             STRING,
+  admin_cid                STRING,   -- 관리자 계정 id (company.cid)
   user_uid                 STRING,
   platform                 STRING,
   browser                  STRING,
@@ -282,8 +283,8 @@ OPTIONS (description = 'PC·브라우저 로그인 이력. MySQL loginBrowserHis
 /* ── login_app — 앱(모바일) 로그인 이력 ──────────────────────────────
    ※ 원본에 updateTime 이 없다. append-only 라 증분 기준이 created_at 이다.
    ※ company_seq 가 없다. user 테이블이 와야 기업에 붙는다.                 */
-DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_login_app`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_login_app`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_login_app`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_login_app`
 (
   login_id                 INT64    NOT NULL,
   user_uid                 STRING,
@@ -300,3 +301,67 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_login_app`
 PARTITION BY DATETIME_TRUNC(created_at, MONTH)
 CLUSTER BY user_uid, created_at
 OPTIONS (description = '앱 로그인 이력. MySQL userLoginHistory. updateTime 이 없어 증분 기준이 created_at 이다.');
+
+
+/* ── user — 사용자 1명이 1행 ─────────────────────────────────────────
+   uid → 기업 대응이 여기서 풀린다. 사용자 확산 측정의 기준.              */
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_user`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_user`
+(
+  user_id                  INT64    NOT NULL,
+  user_uid                 STRING,
+  origin_user_uid          STRING,
+  company_seq              INT64,
+  department_seq           INT64,
+  duty_seq                 INT64,
+  role_seq                 INT64,   -- ※ role 테이블이 없어 의미 미확인
+  enabled_state            STRING,  -- Y승인 N미승인 C기기변경 X탈퇴 B사용중지
+  is_withdrawn             BOOL,
+  email_domain             STRING,  -- 도메인만. 포털/회사 도메인 구분용
+  total_distance           INT64,
+  car_model                STRING,
+  device_id                STRING,
+  device_change_count      INT64,
+  os_type                  STRING,
+  os_version               STRING,
+  app_version              STRING,
+  device_model             STRING,
+  country                  STRING,
+  language                 STRING,
+  is_secondary             BOOL,
+  is_developer             BOOL,
+  has_agreed_terms         BOOL,
+  is_privacy               BOOL,
+  auth_corporation         STRING,
+  auth_individual          STRING,
+  connected_car_state      STRING,  -- N / R해제 / H현대 / K기아 / G제네시스
+  connected_car_seq        INT64,
+  is_workplace_linked      BOOL,
+  demo_company_name        STRING,
+  last_login_at            DATETIME,
+  last_login_date          DATETIME,
+  created_at               DATETIME,
+  updated_at               DATETIME,
+  loaded_at                TIMESTAMP
+)
+CLUSTER BY company_seq, user_uid
+OPTIONS (description = '사용자. MySQL user. 성명·이메일 전체·차량번호·인증정보는 수집하지 않는다. 이메일은 도메인만.');
+
+
+/* ── department — 부서. 계층 구조 ───────────────────────────────────── */
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_department`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_department`
+(
+  department_seq           INT64    NOT NULL,
+  company_seq              INT64,
+  parent_department_seq    INT64,
+  depth                    INT64,
+  department_name          STRING,
+  department_full_name     STRING,
+  is_workplace_linked      BOOL,
+  created_at               DATETIME,
+  updated_at               DATETIME,
+  loaded_at                TIMESTAMP
+)
+CLUSTER BY company_seq
+OPTIONS (description = '부서. MySQL department. drivingLog.departmentSeq 와 user.departmentSeq 를 해석한다.');

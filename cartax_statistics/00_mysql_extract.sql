@@ -4,7 +4,7 @@
    이 파일은 BigQuery가 아니라 서비스 MySQL에서 실행한다. 우리는 실행하지 않는다.
    결과를 parquet으로 아래 경로에 올리면 01번 외부 테이블이 그대로 읽는다.
 
-       gs://cartax-biz_source_db/<테이블>/dt=YYYY-MM-DD/*.parquet
+       gs://cartax-biz_cartax_statistics/<테이블>/dt=YYYY-MM-DD/*.parquet
 
    컬럼 별칭을 여기서 이미 snake_case로 맞춰 둔다. parquet 단계에서 이름이
    정리되어 있으면 BigQuery 쪽 적재가 SELECT * 한 줄로 끝난다.
@@ -253,7 +253,6 @@ WHERE updateTime >= :from AND updateTime < :to;
      accelerationCount, decelerationCount,
      quickStartCount, quickStopCount     안전운전 지표. 쓸 분석이 아직 없다
      startDistance, stopDistance         distance 로 계산된다
-     departmentSeq                       부서 테이블이 아직 없어 해석 불가
      startDrivingType, stopDrivingType   drivingType 과 중복으로 보인다
      uuid, saveMapPoint, mergeCount,
      overlapSeq, overlapComplete,
@@ -265,6 +264,7 @@ SELECT
     companySeq                        AS company_seq,
     carSeq                            AS vehicle_seq,
     userUid                           AS user_uid,
+    departmentSeq                     AS department_seq,     -- department 테이블로 해석된다
     startDate                         AS trip_date,          -- 파티션 키
     startTime                         AS start_time,
     stopTime                          AS stop_time,
@@ -352,7 +352,7 @@ WHERE updateTime >= :from AND updateTime < :to;
 
 /* ---------------------------------------------------------------------------
    [1순위] loginBrowserHistory — PC·브라우저 로그인 이력
-   설계안의 pc_first_login_date / pc_last_login_date / pc_login_count_total 이
+   설계안의 pc_first_login_date / pc_last_login_date / admin_login_count_total 이
    전부 여기서 나온다. 받을 필요 없이 우리가 계산한다.
 
    success/errorMsg 로 로그인 실패까지 남는다. 실패가 반복되는 기업은
@@ -371,7 +371,7 @@ WHERE updateTime >= :from AND updateTime < :to;
 SELECT
     seq                               AS login_id,
     companySeq                        AS company_seq,
-    cid                               AS company_code,
+    cid                               AS admin_cid,          -- 관리자 계정 id. company.cid
     uid                               AS user_uid,
     platform                          AS platform,
     browser                           AS browser,
@@ -415,3 +415,85 @@ SELECT
     createTime                        AS created_at
 FROM userLoginHistory
 WHERE createTime >= :from AND createTime < :to;   -- ★ updateTime 이 없다
+
+
+/* ---------------------------------------------------------------------------
+   [1순위] user — 사용자 1명이 1행
+   uid → 기업 대응이 여기서 풀린다. 지금까지 userLoginHistory 와 drivingLog 를
+   기업에 붙일 방법이 운행 기록뿐이었고, 운행을 한 번도 안 한 사용자가 빠졌다.
+
+   ★ 사용자 확산이 제대로 측정된다.
+     관리자 1명만 쓰는 회사와 직원까지 쓰는 회사는 완전히 다른 고객이다.
+     enabled 로 승인·미승인·탈퇴·정지가 갈리므로 「실제 쓰는 사용자 수」를 센다.
+
+   ※ roleSeq 가 권한이지만 role 테이블이 없어 값의 의미를 모른다.
+     관리자 여부는 당장은 loginBrowserHistory 에 나타나는가로 판단할 수밖에 없다
+     (관리자 콘솔에 로그인했다 = 관리자다). role 테이블을 받으면 바꾼다.
+
+   [가져오지 않는다 — 개인정보]
+     password, autoLoginKey, pushId   인증·푸시 토큰
+     name                             개인 성명
+     carNumber                        개인 차량번호 (준식별자)
+     wp_login_id                      워크플레이스 로그인 아이디
+     email                            → 도메인만 가져온다
+                                        (포털 도메인인지 회사 도메인인지 보려고)
+   ------------------------------------------------------------------------- */
+SELECT
+    seq                               AS user_id,
+    uid                               AS user_uid,
+    orgUid                            AS origin_user_uid,
+    companySeq                        AS company_seq,
+    departmentSeq                     AS department_seq,
+    dutySeq                           AS duty_seq,
+    roleSeq                           AS role_seq,           -- ※ role 테이블이 없어 의미 미확인
+    enabled                           AS enabled_state,      -- Y승인 N미승인 C기기변경 X탈퇴 B사용중지
+    (enabled = 'X')                   AS is_withdrawn,
+    SUBSTRING_INDEX(email, '@', -1)   AS email_domain,       -- 전체 주소 아님
+    totalDistance                     AS total_distance,
+    carModel                          AS car_model,
+    deviceId                          AS device_id,
+    deviceChangeCount                 AS device_change_count,
+    osType                            AS os_type,
+    osVersion                         AS os_version,
+    versionName                       AS app_version,
+    model                             AS device_model,
+    country                           AS country,
+    language                          AS language,
+    (secondary = 'Y')                 AS is_secondary,
+    (developerAuth = 'Y')             AS is_developer,
+    (agreeTerms = 'Y')                AS has_agreed_terms,
+    (isPrivacy = 'Y')                 AS is_privacy,
+    corporationAuth                   AS auth_corporation,
+    individualAuth                    AS auth_individual,
+    hyundaiState                      AS connected_car_state,-- N / R해제 / H현대 / K기아 / G제네시스
+    hyundaiCarSeq                     AS connected_car_seq,
+    (wp_emp_id IS NOT NULL)           AS is_workplace_linked,-- 네이버 워크플레이스 연동 여부만
+    companyName                       AS demo_company_name,  -- 데모 체험시 입력한 회사명
+    lastLogin                         AS last_login_at,
+    lastLoginDate                     AS last_login_date,
+    createTime                        AS created_at,
+    updateTime                        AS updated_at
+FROM `user`
+WHERE updateTime >= :from AND updateTime < :to;
+
+
+/* ---------------------------------------------------------------------------
+   [2순위] department — 부서. 계층 구조다
+   drivingLog.departmentSeq 와 user.departmentSeq 를 해석한다.
+   부서별 운행 분포, 조직 깊이(depth)로 도입 규모를 본다.
+
+   ※ name / fullName 은 부서명이라 개인정보가 아니다. 다만 소규모 회사에서
+     「홍길동팀」처럼 사람 이름이 들어올 수 있다. 적재 후 확인한다.
+   ------------------------------------------------------------------------- */
+SELECT
+    seq                               AS department_seq,
+    companySeq                        AS company_seq,
+    parentSeq                         AS parent_department_seq,
+    depth                             AS depth,
+    name                              AS department_name,
+    fullName                          AS department_full_name,
+    (deptNo IS NOT NULL)              AS is_workplace_linked, -- 워크플레이스 부서 key 존재 여부만
+    createTime                        AS created_at,
+    updateTime                        AS updated_at
+FROM department
+WHERE updateTime >= :from AND updateTime < :to;

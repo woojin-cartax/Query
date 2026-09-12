@@ -14,7 +14,7 @@
      한쪽을 고치면 반드시 다른 쪽도 고친다.
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.source_db.view_company` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_company` AS
 SELECT
   c.company_seq,
   c.company_code,
@@ -22,6 +22,7 @@ SELECT
   c.company_number,
   c.business_type,
   c.plan_level,
+  `carbiz-6f7fc.cartax_statistics`.plan_name(c.plan_level) AS plan_name,
   c.enabled_state,
   c.is_withdrawn,
   c.signup_date,
@@ -116,6 +117,6 @@ SELECT
   c.setting_privacy_mode,
   c.setting_save_map_point,
   c.updated_at
-FROM `carbiz-6f7fc.source_db.raw_company` c
-LEFT JOIN `carbiz-6f7fc.source_db.raw_company_pay_state` s
+FROM `carbiz-6f7fc.cartax_statistics.raw_company` c
+LEFT JOIN `carbiz-6f7fc.cartax_statistics.raw_company_pay_state` s
   ON c.company_seq = s.company_seq;

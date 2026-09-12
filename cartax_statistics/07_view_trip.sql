@@ -16,12 +16,13 @@
        ③ GPS 실운행 판정       gps_distance > 0 이면 실제 주행이라는 전제
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.source_db.view_trip` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_trip` AS
 SELECT
   t.trip_id,
   t.company_seq,
   t.vehicle_seq,
   t.user_uid,
+  t.department_seq,
   t.trip_date,
   t.start_time,
   t.stop_time,
@@ -85,4 +86,4 @@ SELECT
   t.overlap_state,
   t.created_at,
   t.updated_at
-FROM `carbiz-6f7fc.source_db.raw_trip` t;
+FROM `carbiz-6f7fc.cartax_statistics.raw_trip` t;

@@ -10,14 +10,11 @@
      섞이면 업셀 기회를 위험 고객으로 분류하게 된다.
      원천의 contractType 이 이미 둘을 구분해 준다. 날짜 대조로 추론할 필요가 없다.
 
-   ※ plan_level 의 숫자 ↔ 요금제 이름 대응은 아직 확인되지 않았다.
-     샘플에서 company.level 은 1·3, payment.level 은 2·3 이 관찰됐고
-     freeExperienceHistory.level 기본값이 2 다.
-     기존 signup_90days 의 FREE/PLUS/PREMIUM 과 맞춰 봐야 한다.
-     확인 전까지 plan_name 은 쓰지 않는다.
+   plan_level 은 1=free / 2=plus / 3=premium 이다 (2026-09-12 확인).
+   이름 변환은 04_udf.sql 의 plan_name() 한 곳에만 둔다.
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.source_db.view_payment` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_payment` AS
 WITH
 /* 실제 결제 시도 — 성공·취소 */
 attempt AS (
@@ -60,7 +57,7 @@ attempt AS (
 
     /* 순매출 — 환불을 뺀 실수령액 */
     IFNULL(p.amount, 0) - IFNULL(p.refund_amount, 0) AS net_amount
-  FROM `carbiz-6f7fc.source_db.raw_payment` p
+  FROM `carbiz-6f7fc.cartax_statistics.raw_payment` p
 ),
 
 /* 정기결제 예약의 결과 — 실패가 여기에만 남는다 */
@@ -84,7 +81,7 @@ schedule AS (
       WHEN 'C' THEN 'cancel'
       WHEN 'E' THEN 'fail'
     END AS result
-  FROM `carbiz-6f7fc.source_db.raw_pay_schedule` s
+  FROM `carbiz-6f7fc.cartax_statistics.raw_pay_schedule` s
 )
 
 /* 두 원천을 하나의 사실 흐름으로 합친다.
@@ -99,6 +96,7 @@ SELECT
   result,
   contract_type               AS raw_type,
   plan_level,
+  `carbiz-6f7fc.cartax_statistics`.plan_name(plan_level) AS plan_name,
   license_count,
   term_month,
   contract_begin_date,
@@ -126,6 +124,7 @@ SELECT
   result,
   status                      AS raw_type,
   plan_level,
+  `carbiz-6f7fc.cartax_statistics`.plan_name(plan_level) AS plan_name,
   license_count,
   CAST(NULL AS INT64)         AS term_month,
   CAST(NULL AS DATE)          AS contract_begin_date,

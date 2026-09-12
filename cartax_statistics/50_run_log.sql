@@ -11,7 +11,7 @@
      FAIL     예외가 났다
    ========================================================================= */
 
-CREATE TABLE IF NOT EXISTS `carbiz-6f7fc.source_db.query_run_log`
+CREATE TABLE IF NOT EXISTS `carbiz-6f7fc.cartax_statistics.query_run_log`
 (
   target_date    DATE,        -- 적재 대상일 (GCS dt)
   job_name       STRING,      -- 예약 쿼리 이름
@@ -23,4 +23,4 @@ CREATE TABLE IF NOT EXISTS `carbiz-6f7fc.source_db.query_run_log`
   logged_at      TIMESTAMP
 )
 CLUSTER BY target_date, target_table
-OPTIONS (description = 'source_db 적재 실행 기록. EMPTY 는 성공이 아니라 무증상 실패 신호다.');
+OPTIONS (description = 'cartax_statistics 적재 실행 기록. EMPTY 는 성공이 아니라 무증상 실패 신호다.');

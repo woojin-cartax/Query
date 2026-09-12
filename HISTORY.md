@@ -12,6 +12,46 @@
 
 ---
 
+## 2026-09-12 — 데이터셋명 확정, user·department 반입, plan_level 확정
+
+폴더·데이터셋을 `source_db` → **`cartax_statistics`** 로 바꿨다. 배포 전이라
+이름만 바꾸면 된다. 버킷도 `gs://cartax-biz_cartax_statistics/` 로 맞췄다
+(기존 규칙 `cartax-biz_<데이터셋>` 그대로. 「cartax」가 겹쳐 읽기는 어색하나
+규칙에 예외를 두지 않는 쪽을 택했다).
+
+**`plan_level` 1=free / 2=plus / 3=premium 확정.** 변환을 뷰마다 쓰면 정의가
+갈라진다 — signup_90days 에서 유료 판정이 두 벌로 갈려 같은 KPI 뷰 안에서
+유료 기업 수가 494 와 496 으로 나온 적이 있다. `04_udf.sql` 의 `plan_name()`
+한 곳에만 둔다. 뷰가 이걸 의존하므로 번호를 다시 매겼다(뷰 04~07 → 05~09).
+
+**`user`(42컬럼)·`department`(11컬럼) 반입.** 24개 시트 605컬럼이 됐다.
+`user.companySeq` 로 **uid → 기업 대응이 풀린다.** 그 전까지 `userLoginHistory`
+와 `drivingLog` 를 기업에 붙일 방법이 운행 기록뿐이었고, 운행을 한 번도 안 한
+사용자가 빠졌다. `08_view_login.sql` 의 CTE 를 `raw_user` 로 갈아끼웠다.
+
+`user.enabled` 가 5값(Y승인 N미승인 C기기변경 X탈퇴 B사용중지)이라 **사용자 수가
+하나가 아니다.** `09_view_user.sql` 이 넷을 따로 센다. 기존 `signup_90days` 의
+`user_count` 가 어느 것인지 대조해야 한다(`90_check.sql` 14번). 대조 전에는 두
+시스템의 사용자 수를 같은 것으로 보지 않는다.
+
+**`loginBrowserHistory` 는 관리자 로그인이다.** `cid` 가 관리자 계정
+id(`company.cid`)다. 일반 사용자 로그인이 아니다. `login_pc` → `login_admin` 으로
+바꾸고 `cid` 별칭도 `company_code` → `admin_cid` 로 고쳤다. 앱 로그인과 합쳐 세지
+않는다 — 관리자만 들어오는 회사와 직원까지 앱을 쓰는 회사가 갈리는 것이 도입
+확산의 가장 직접적인 신호다. `is_admin_only` 로 판정한다.
+
+**`drivingLog.departmentSeq` 를 수집 대상에 넣었다.** 부서 테이블이 없어 해석
+불가라 뺐던 것인데 `department` 가 와서 풀렸다.
+
+**관리자 여부는 아직 판정할 수 없다.** `user.roleSeq` 가 권한 컬럼이지만 `role`
+테이블이 없어 값의 의미를 모른다. 지금은 「비즈 관리자 페이지에 로그인했다 =
+관리자다」라는 행동 기준뿐이다. `90_check.sql` 13번이 `role_seq` 분포와 관리자
+로그인의 상관을 본다. `role`·`duty` 테이블을 받는 편이 낫다.
+
+`payment.memo`(해지 사유 후보)는 보류. 나중에 값을 확인한다.
+
+테이블 12개 전부 DDL 과 추출 쿼리의 컬럼 이름·순서 일치 확인. 드라이런 통과.
+
 ## 2026-09-12 — 로그인 이력 2개 반입, 해지 사유 부재 확인
 
 `DB_list.xlsx` 에 `loginBrowserHistory`(PC) · `userLoginHistory`(앱)가 추가되어
