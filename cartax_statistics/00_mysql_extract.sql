@@ -345,7 +345,7 @@ WHERE updateTime >= :from AND updateTime < :to;
    [가져오지 않는다]
      clientIp    암호화돼 있어도 로그인 시도 IP다. 쓸 분석이 없다
      userAgent   raw 문자열. platform / browser / version 으로 이미 파싱돼 있다
-     parent      의미 미확인. 확인 후 필요하면 추가한다
+     parent      브라우저 정보로 확인됨. browser 와 중복이라 불필요
 
    ※ 원본 컬럼명이 updateTIme 다 (대문자 I). 오타지만 원본은 고칠 수 없다.
      적재하면서 updated_at 으로 바로잡는다.
@@ -411,8 +411,8 @@ WHERE createTime >= :from AND createTime < :to;   -- ★ updateTime 이 없다
      관리자 1명만 쓰는 회사와 직원까지 쓰는 회사는 완전히 다른 고객이다.
      enabled 로 승인·미승인·탈퇴·정지가 갈리므로 「실제 쓰는 사용자 수」를 센다.
 
-   ※ roleSeq = 0 이 최고관리자다. 나머지는 사용자로 분류한다.
-     role 테이블이 없어 0 이외 값들의 차이는 모른다.
+   ※ roleSeq = 0 이 최고관리자다. 나머지는 전부 사용자다. (2026-09-12 확인)
+     role 테이블은 받을 필요가 없다 — 우리에게 필요한 구분이 둘뿐이다.
 
    [가져오지 않는다 — 개인정보]
      password, autoLoginKey, pushId   인증·푸시 토큰
@@ -427,7 +427,8 @@ WHERE createTime >= :from AND createTime < :to;   -- ★ updateTime 이 없다
      totalDistance, carModel, deviceChangeCount, osType, osVersion,
      versionName, model, country, language, secondary, developerAuth,
      agreeTerms, isPrivacy, corporationAuth, individualAuth,
-     hyundaiState, hyundaiCarSeq, companyName, dutySeq(duty 테이블 없음)
+     hyundaiState, hyundaiCarSeq, companyName,
+     dutySeq(직급이라 분석에 쓰지 않는다. duty 테이블도 받을 필요 없다)
    ------------------------------------------------------------------------- */
 SELECT
     seq                               AS user_id,
@@ -435,7 +436,7 @@ SELECT
     orgUid                            AS origin_user_uid,
     companySeq                        AS company_seq,
     departmentSeq                     AS department_seq,
-    roleSeq                           AS role_seq,           -- 0 = 최고관리자. 나머지 값의 차이는 미확인
+    roleSeq                           AS role_seq,           -- 0 = 최고관리자. 나머지는 전부 사용자
     enabled                           AS enabled_state,      -- Y승인 N미승인 C기기변경 X탈퇴 B사용중지
     (enabled = 'X')                   AS is_withdrawn,
     SUBSTRING_INDEX(email, '@', -1)   AS email_domain,       -- 전체 주소 아님

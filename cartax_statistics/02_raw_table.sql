@@ -295,7 +295,7 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_user`
   origin_user_uid          STRING,
   company_seq              INT64,
   department_seq           INT64,
-  role_seq                 INT64,   -- ※ role 테이블이 없어 의미 미확인
+  role_seq                 INT64,   -- 0 = 최고관리자. 나머지는 전부 사용자
   enabled_state            STRING,  -- Y승인 N미승인 C기기변경 X탈퇴 B사용중지
   is_withdrawn             BOOL,
   email_domain             STRING,  -- 도메인만. 포털/회사 도메인 구분용
