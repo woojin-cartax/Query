@@ -335,16 +335,24 @@ GROUP BY has_expanded;
 
 
 /* ── 19. 아하 모먼트 후보 비교 ───────────────────────────────────────
-   설계안은 「첫 5건 운행」을 후보로 봤다. 그건 사용자 한 명의 행동이다.
-   2단계 구조가 맞다면 진짜 전환점은 「관리자가 아닌 첫 직원이 운행을 기록한 날」
-   일 수 있다. 두 후보의 도달 속도를 유지/이탈로 갈라 비교한다.
+   후보가 둘이고 배타적이지 않다. 둘 다 재고 어느 쪽이 갱신·이탈과 더 붙는지 본다.
 
-   확정이 아니라 탐색이다. 차이가 안 나면 다른 후보를 찾는다. */
+     ① 회사의 첫 N건 운행 — 누가 기록했는지 상관없다. 현재 가설은 5건
+     ② 관리자가 아닌 첫 직원의 운행 — 확산이 일어난 시점
+
+   유지 기업의 중앙값이 이탈 기업보다 뚜렷하게 짧으면 그 지표가 후보다.
+   차이가 안 나면 다른 후보를 찾는다. 확정이 아니라 탐색이다. */
 SELECT
   IF(is_withdrawn, '이탈', '유지')                   AS status,
   COUNT(*)                                          AS companies,
-  APPROX_QUANTILES(days_to_admin_trip, 4)           AS days_to_admin_trip_q,
-  APPROX_QUANTILES(days_to_member_invite, 4)        AS days_to_member_invite_q,
+  -- ① 회사 기준 도달 속도
+  COUNTIF(reached_aha)                              AS reached_trip_5,
+  ROUND(COUNTIF(reached_aha) / COUNT(*) * 100, 1)   AS reached_trip_5_pct,
+  APPROX_QUANTILES(days_to_trip_1, 4)               AS days_to_trip_1_q,
+  APPROX_QUANTILES(days_to_trip_3, 4)               AS days_to_trip_3_q,
+  APPROX_QUANTILES(days_to_trip_5, 4)               AS days_to_trip_5_q,
+  APPROX_QUANTILES(days_to_trip_10, 4)              AS days_to_trip_10_q,
+  -- ② 확산
   APPROX_QUANTILES(days_to_member_trip, 4)          AS days_to_member_trip_q,
   APPROX_QUANTILES(days_admin_to_member_trip, 4)    AS days_admin_to_member_q,
   COUNTIF(invited_but_no_trip)                      AS invited_but_no_trip,
@@ -352,6 +360,29 @@ SELECT
 FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
 WHERE NOT is_test_account
 GROUP BY status;
+
+
+/* ── 19b. N을 몇으로 잡아야 하나 ─────────────────────────────────────
+   「첫 5건」은 가설이다. 1·3·5·10 중 유지/이탈을 가장 크게 가르는 것이 답이다.
+   도달률 차이(유지 − 이탈)가 가장 큰 N을 고른다.
+
+   ※ 생존 편향에 주의한다. 오래 산 기업이 당연히 더 많은 운행을 쌓는다.
+     가입 후 30일 안에 도달했는가로 잘라서 기간을 맞춘다. */
+SELECT n,
+  COUNTIF(NOT withdrawn)                            AS alive,
+  COUNTIF(withdrawn)                                AS churned,
+  ROUND(COUNTIF(NOT withdrawn AND within_30d) / NULLIF(COUNTIF(NOT withdrawn), 0) * 100, 1)
+                                                    AS alive_reached_pct,
+  ROUND(COUNTIF(withdrawn AND within_30d) / NULLIF(COUNTIF(withdrawn), 0) * 100, 1)
+                                                    AS churned_reached_pct
+FROM (
+  SELECT is_withdrawn AS withdrawn, n, d <= 30 AS within_30d
+  FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`,
+  UNNEST([STRUCT(1 AS n, days_to_trip_1 AS d),
+          (3, days_to_trip_3), (5, days_to_trip_5), (10, days_to_trip_10)])
+  WHERE NOT is_test_account
+)
+GROUP BY n ORDER BY n;
 
 
 /* ── 20. 확산이 먼저인가 결제가 먼저인가 ─────────────────────────────

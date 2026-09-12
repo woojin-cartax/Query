@@ -14,11 +14,19 @@
      관리자 혼자 쓰다 끝나는 기업과 직원까지 퍼진 기업은 갱신 확률이 다를 것이다.
      「어느 단계에서 멈췄나」와 「거기서 얼마나 오래 멈춰 있나」가 개입 시점을 준다.
 
-   ※ 아하 모먼트 후보가 바뀐다.
-     설계안은 「첫 5건 운행」을 후보로 봤는데 그건 사용자 한 명의 행동이다.
-     이 구조가 맞다면 진짜 전환점은 stage 3→5, 즉 관리자가 아닌 첫 직원이
-     실제로 운행을 기록한 순간이다. days_to_first_member_trip 이 그 측정값이다.
-     확정된 것은 아니고, 갱신·이탈과 교차해서 확인해야 한다.
+   ※ 아하 모먼트 후보가 둘이다. 하나를 고르는 게 아니라 둘 다 재고 비교한다.
+
+     ① 회사의 첫 N건 운행 — 누가 기록했는지는 상관없다
+        「첫 5건」이 현재 가설이다. 관리자가 5건을 다 했든 직원이 했든,
+        회사 계정에 운행이 5건 쌓였다는 사실이 전환점이라는 것이다.
+        기준이 3건이나 10건으로 바뀔 수 있어 N을 넷 다 계산해 둔다.
+        원천 운행을 다 갖고 있으므로 다른 N이 필요해져도 여기만 고치면 된다.
+
+     ② 관리자가 아닌 첫 직원의 운행 — 2단계 진입
+        days_to_member_trip. 확산이 일어난 시점이다.
+
+     둘은 배타적이지 않다. ①이 도달 속도를, ②가 확산 여부를 말한다.
+     어느 쪽이 갱신·이탈과 더 붙는지는 90_check.sql 19번이 비교한다.
 
    ※ 성능 — 이 뷰는 raw_trip 전 기간을 훑는다.
      대시보드에서 매번 호출하면 비싸다. 실제로 쓰기 시작하면 뷰가 아니라
@@ -36,6 +44,33 @@ member_uid AS (
   WHERE user_uid IS NOT NULL
     AND company_seq IS NOT NULL
     AND NOT `carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq)
+),
+
+/* 회사의 N번째 운행이 언제였나. 누가 기록했는지는 보지 않는다.
+   ※ ORDER BY 에 trip_id 를 마지막에 둔다.
+     날짜와 시각만으로 정렬하면 같은 시각의 운행에서 순위가 실행마다 달라진다.
+     signup_90days 에서 정렬키 4개가 모두 동점이라 세 번 실행에 세 번 다른
+     계정이 남은 적이 있다. 결정적 tiebreak 가 없으면 숫자가 흔들린다. */
+trip_rank AS (
+  SELECT
+    company_seq, trip_date,
+    ROW_NUMBER() OVER (PARTITION BY company_seq
+                       ORDER BY trip_date, start_time, trip_id) AS rn
+  FROM `carbiz-6f7fc.cartax_statistics.view_trip`
+  WHERE trip_date >= '2016-01-01'
+    AND is_countable
+),
+
+trip_nth AS (
+  SELECT
+    company_seq,
+    MIN(IF(rn =  1, trip_date, NULL))                 AS trip_1_date,
+    MIN(IF(rn =  3, trip_date, NULL))                 AS trip_3_date,
+    MIN(IF(rn =  5, trip_date, NULL))                 AS trip_5_date,
+    MIN(IF(rn = 10, trip_date, NULL))                 AS trip_10_date
+  FROM trip_rank
+  WHERE rn <= 10
+  GROUP BY company_seq
 ),
 
 /* 운행 — 관리자가 만든 것과 직원이 만든 것을 나눈다 */
@@ -94,6 +129,12 @@ base AS (
     c.is_auto_pay,
     c.license_count,
 
+    /* ── 회사 기준 운행 이정표 — 누가 했는지 상관없다 ── */
+    n.trip_1_date,
+    n.trip_3_date,
+    n.trip_5_date,
+    n.trip_10_date,
+
     /* ── 1단계 이정표 ── */
     DATE(l.admin_first_login_at)                      AS admin_first_login_date,
     t.admin_first_trip_date,
@@ -119,6 +160,7 @@ base AS (
   LEFT JOIN `carbiz-6f7fc.cartax_statistics.view_login_company` l USING (company_seq)
   LEFT JOIN `carbiz-6f7fc.cartax_statistics.view_user_company`  u USING (company_seq)
   LEFT JOIN trip           t  USING (company_seq)
+  LEFT JOIN trip_nth       n  USING (company_seq)
   LEFT JOIN member_login   ml USING (company_seq)
   LEFT JOIN member_created mc USING (company_seq)
   LEFT JOIN pay            p  USING (company_seq)
@@ -152,9 +194,19 @@ SELECT
   IF(b.member_first_created_date IS NOT NULL, 'expansion', 'admin')
                                                     AS stage_group,
 
+  /* ── 회사 기준 도달 속도 ───────────────────────────────────────────
+     아하 모먼트 후보 ①. 누가 기록했는지는 보지 않는다.
+     현재 가설은 5건이지만 기준이 바뀔 수 있어 넷 다 둔다.                   */
+  DATE_DIFF(b.trip_1_date,  b.signup_date, DAY)      AS days_to_trip_1,
+  DATE_DIFF(b.trip_3_date,  b.signup_date, DAY)      AS days_to_trip_3,
+  DATE_DIFF(b.trip_5_date,  b.signup_date, DAY)      AS days_to_trip_5,
+  DATE_DIFF(b.trip_10_date, b.signup_date, DAY)      AS days_to_trip_10,
+
+  /* 현재 기준의 아하 모먼트 도달 여부. 기준이 바뀌면 여기 한 줄만 고친다 */
+  (b.trip_5_date IS NOT NULL)                        AS reached_aha,
+
   /* ── 단계별 소요일 ─────────────────────────────────────────────────
-     아하 모먼트 탐색의 재료다. 빨리 도달한 기업과 못 한 기업을 갈라
-     갱신·이탈과 교차한다.                                                  */
+     아하 모먼트 후보 ②. 확산이 일어난 시점이다.                            */
   DATE_DIFF(b.admin_first_login_date,    b.signup_date, DAY) AS days_to_admin_login,
   DATE_DIFF(b.admin_first_trip_date,     b.signup_date, DAY) AS days_to_admin_trip,
   DATE_DIFF(b.member_first_created_date, b.signup_date, DAY) AS days_to_member_invite,
