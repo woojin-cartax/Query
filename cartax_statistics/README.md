@@ -52,8 +52,8 @@ MySQL ──00──▶ parquet ──▶ gs://cartax-biz_cartax_statistics/<테
 | 현재 결제 상태 | `companyPayState` (+`History`) | 1 | 설계안의 「현재 상태 15개」를 통째로 대체 |
 | 체험 | `freeExperienceHistory` | 1 | |
 | `company` | `company` | 2 | 사업자등록번호·업종·가입경로·GA clientId |
-| `user_history` | `user` | 1 | uid → 기업 대응. 사용자 확산 측정의 기준 |
-| 부서 | `department` | 2 | `drivingLog.departmentSeq` 해석 |
+| `user_history` | `user` | 1 | uid → 기업 대응. 42컬럼 중 13개 |
+| 부서 | `department` | 2 | 개수와 계층 깊이만. 부서명은 안 받는다 |
 | 관리자 로그인 | `loginBrowserHistory` | 1 | 비즈 관리자 페이지. 성공·실패·referer |
 | 앱 로그인 | `userLoginHistory` | 1 | 기기·OS·앱 버전. `has_app_login` |
 | `vehicle_history` | `car` | 3 | 이탈 선행지표 아님이 실증됨. 나중에 |
@@ -198,7 +198,17 @@ X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적
 
 ## 수집하지 않는 것
 
-개인정보는 원천에 있어도 가져오지 않는다. 추출 쿼리 주석에 테이블별로 적어 두었다.
+개인정보는 원천에 있어도 가져오지 않는다. 그와 별개로, **쓸 분석이 없으면 받지
+않는다**(설계안 선별 기준 4). 원천에 남아 있으므로 나중에 받을 수 있다.
+
+| 테이블 | 원본 | 받는 것 | 뺀 이유 |
+|---|---|---|---|
+| `drivingLog` → `trip` | 60 | 29 | 주소·좌표·성명·메모(개인정보), 안전운전 지표(쓸 분석 없음) |
+| `user` | 42 | 13 | 기기·OS·언어·권한 세부·커넥티드카(쓸 분석 없음), 성명·이메일·토큰(개인정보) |
+| `department` | 11 | 6 | 부서명(어느 집계에도 안 들어감 + 「홍길동팀」 위험) |
+| `company` | 56 | 38 | 인증·성명·연락처·미사용 표시 컬럼 |
+
+추출 쿼리 주석에 테이블별로 무엇을 왜 뺐는지 적어 두었다.
 
 | 대상 | 처리 |
 |---|---|
@@ -211,9 +221,10 @@ X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적
 | 자유 입력 (`bigo`, `adminMemo`, `cartaxMemo`, `car.memo`) | 제외 |
 | 차량번호 (`car.number`, `user.carNumber`) | 제외 (준식별자) |
 | 사용자 성명 (`user.name`) | 제외 |
-| 푸시 토큰 (`user.pushId`) | 제외 |
+| 푸시 토큰·기기 ID (`user.pushId`, `user.deviceId`) | 제외 |
 | 사용자 이메일 (`user.email`) | 도메인만 (포털/회사 도메인 구분용) |
-| 워크플레이스 로그인 아이디 (`user.wp_login_id`) | 제외. 연동 여부(BOOL)만 |
+| 워크플레이스 식별자 (`user.wp_login_id`, `wp_emp_id`) | 제외 |
+| 부서명 (`department.name`, `fullName`) | 제외 |
 | 로그인 IP (`loginBrowserHistory.clientIp`) | 제외 (암호화돼 있어도 쓸 분석이 없다) |
 | userAgent raw (`loginBrowserHistory.userAgent`) | 제외 (platform/browser/version 으로 파싱돼 있다) |
 

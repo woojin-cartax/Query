@@ -422,21 +422,30 @@ WHERE createTime >= :from AND createTime < :to;   -- ★ updateTime 이 없다
    uid → 기업 대응이 여기서 풀린다. 지금까지 userLoginHistory 와 drivingLog 를
    기업에 붙일 방법이 운행 기록뿐이었고, 운행을 한 번도 안 한 사용자가 빠졌다.
 
+   42컬럼 중 13개만 받는다. 기기·OS·언어·권한 세부·커넥티드카 상태 등은
+   쓸 분석이 없어 뺐다 (선별 기준 4). 원천에 남아 있으므로 나중에 받을 수 있다.
+
    ★ 사용자 확산이 제대로 측정된다.
      관리자 1명만 쓰는 회사와 직원까지 쓰는 회사는 완전히 다른 고객이다.
      enabled 로 승인·미승인·탈퇴·정지가 갈리므로 「실제 쓰는 사용자 수」를 센다.
 
-   ※ roleSeq 가 권한이지만 role 테이블이 없어 값의 의미를 모른다.
-     관리자 여부는 당장은 loginBrowserHistory 에 나타나는가로 판단할 수밖에 없다
-     (관리자 콘솔에 로그인했다 = 관리자다). role 테이블을 받으면 바꾼다.
+   ※ roleSeq = 0 이 최고관리자다. 나머지는 사용자로 분류한다.
+     role 테이블이 없어 0 이외 값들의 차이는 모른다.
 
    [가져오지 않는다 — 개인정보]
      password, autoLoginKey, pushId   인증·푸시 토큰
      name                             개인 성명
      carNumber                        개인 차량번호 (준식별자)
-     wp_login_id                      워크플레이스 로그인 아이디
+     wp_login_id, wp_emp_id           워크플레이스 식별자
+     deviceId, pushId                 기기·푸시 토큰
      email                            → 도메인만 가져온다
                                         (포털 도메인인지 회사 도메인인지 보려고)
+
+   [가져오지 않는다 — 쓸 분석이 없다]
+     totalDistance, carModel, deviceChangeCount, osType, osVersion,
+     versionName, model, country, language, secondary, developerAuth,
+     agreeTerms, isPrivacy, corporationAuth, individualAuth,
+     hyundaiState, hyundaiCarSeq, companyName, dutySeq(duty 테이블 없음)
    ------------------------------------------------------------------------- */
 SELECT
     seq                               AS user_id,
@@ -444,31 +453,10 @@ SELECT
     orgUid                            AS origin_user_uid,
     companySeq                        AS company_seq,
     departmentSeq                     AS department_seq,
-    dutySeq                           AS duty_seq,
-    roleSeq                           AS role_seq,           -- ※ role 테이블이 없어 의미 미확인
+    roleSeq                           AS role_seq,           -- 0 = 최고관리자. 나머지 값의 차이는 미확인
     enabled                           AS enabled_state,      -- Y승인 N미승인 C기기변경 X탈퇴 B사용중지
     (enabled = 'X')                   AS is_withdrawn,
     SUBSTRING_INDEX(email, '@', -1)   AS email_domain,       -- 전체 주소 아님
-    totalDistance                     AS total_distance,
-    carModel                          AS car_model,
-    deviceId                          AS device_id,
-    deviceChangeCount                 AS device_change_count,
-    osType                            AS os_type,
-    osVersion                         AS os_version,
-    versionName                       AS app_version,
-    model                             AS device_model,
-    country                           AS country,
-    language                          AS language,
-    (secondary = 'Y')                 AS is_secondary,
-    (developerAuth = 'Y')             AS is_developer,
-    (agreeTerms = 'Y')                AS has_agreed_terms,
-    (isPrivacy = 'Y')                 AS is_privacy,
-    corporationAuth                   AS auth_corporation,
-    individualAuth                    AS auth_individual,
-    hyundaiState                      AS connected_car_state,-- N / R해제 / H현대 / K기아 / G제네시스
-    hyundaiCarSeq                     AS connected_car_seq,
-    (wp_emp_id IS NOT NULL)           AS is_workplace_linked,-- 네이버 워크플레이스 연동 여부만
-    companyName                       AS demo_company_name,  -- 데모 체험시 입력한 회사명
     lastLogin                         AS last_login_at,
     lastLoginDate                     AS last_login_date,
     createTime                        AS created_at,
@@ -480,19 +468,17 @@ WHERE updateTime >= :from AND updateTime < :to;
 /* ---------------------------------------------------------------------------
    [2순위] department — 부서. 계층 구조다
    drivingLog.departmentSeq 와 user.departmentSeq 를 해석한다.
-   부서별 운행 분포, 조직 깊이(depth)로 도입 규모를 본다.
+   부서 개수와 조직 깊이(depth)로 도입 규모를 본다.
 
-   ※ name / fullName 은 부서명이라 개인정보가 아니다. 다만 소규모 회사에서
-     「홍길동팀」처럼 사람 이름이 들어올 수 있다. 적재 후 확인한다.
+   ※ 부서명(name / fullName)은 받지 않는다. 부서를 몇 개 만들었고 계층이 몇
+     단계인지만 알면 되고, 이름은 어느 집계에도 안 들어간다. 소규모 회사에서
+     「홍길동팀」처럼 사람 이름이 들어올 수 있는 위험도 같이 사라진다.
    ------------------------------------------------------------------------- */
 SELECT
     seq                               AS department_seq,
     companySeq                        AS company_seq,
     parentSeq                         AS parent_department_seq,
     depth                             AS depth,
-    name                              AS department_name,
-    fullName                          AS department_full_name,
-    (deptNo IS NOT NULL)              AS is_workplace_linked, -- 워크플레이스 부서 key 존재 여부만
     createTime                        AS created_at,
     updateTime                        AS updated_at
 FROM department

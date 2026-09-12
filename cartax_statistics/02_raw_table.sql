@@ -313,31 +313,10 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_user`
   origin_user_uid          STRING,
   company_seq              INT64,
   department_seq           INT64,
-  duty_seq                 INT64,
   role_seq                 INT64,   -- ※ role 테이블이 없어 의미 미확인
   enabled_state            STRING,  -- Y승인 N미승인 C기기변경 X탈퇴 B사용중지
   is_withdrawn             BOOL,
   email_domain             STRING,  -- 도메인만. 포털/회사 도메인 구분용
-  total_distance           INT64,
-  car_model                STRING,
-  device_id                STRING,
-  device_change_count      INT64,
-  os_type                  STRING,
-  os_version               STRING,
-  app_version              STRING,
-  device_model             STRING,
-  country                  STRING,
-  language                 STRING,
-  is_secondary             BOOL,
-  is_developer             BOOL,
-  has_agreed_terms         BOOL,
-  is_privacy               BOOL,
-  auth_corporation         STRING,
-  auth_individual          STRING,
-  connected_car_state      STRING,  -- N / R해제 / H현대 / K기아 / G제네시스
-  connected_car_seq        INT64,
-  is_workplace_linked      BOOL,
-  demo_company_name        STRING,
   last_login_at            DATETIME,
   last_login_date          DATETIME,
   created_at               DATETIME,
@@ -345,7 +324,7 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_user`
   loaded_at                TIMESTAMP
 )
 CLUSTER BY company_seq, user_uid
-OPTIONS (description = '사용자. MySQL user. 성명·이메일 전체·차량번호·인증정보는 수집하지 않는다. 이메일은 도메인만.');
+OPTIONS (description = '사용자. MySQL user. 42컬럼 중 13개. 성명·이메일 전체·차량번호·기기·인증정보는 수집하지 않는다.');
 
 
 /* ── department — 부서. 계층 구조 ───────────────────────────────────── */
@@ -356,12 +335,9 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_department`
   company_seq              INT64,
   parent_department_seq    INT64,
   depth                    INT64,
-  department_name          STRING,
-  department_full_name     STRING,
-  is_workplace_linked      BOOL,
   created_at               DATETIME,
   updated_at               DATETIME,
   loaded_at                TIMESTAMP
 )
 CLUSTER BY company_seq
-OPTIONS (description = '부서. MySQL department. drivingLog.departmentSeq 와 user.departmentSeq 를 해석한다.');
+OPTIONS (description = '부서. MySQL department. 부서 개수와 계층 깊이만 본다. 부서명은 수집하지 않는다.');

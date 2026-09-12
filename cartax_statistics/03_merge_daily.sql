@@ -247,17 +247,8 @@ BEGIN
   WHEN MATCHED AND S.updated_at > T.updated_at THEN UPDATE SET
     user_uid = S.user_uid, origin_user_uid = S.origin_user_uid,
     company_seq = S.company_seq, department_seq = S.department_seq,
-    duty_seq = S.duty_seq, role_seq = S.role_seq, enabled_state = S.enabled_state,
+    role_seq = S.role_seq, enabled_state = S.enabled_state,
     is_withdrawn = S.is_withdrawn, email_domain = S.email_domain,
-    total_distance = S.total_distance, car_model = S.car_model,
-    device_id = S.device_id, device_change_count = S.device_change_count,
-    os_type = S.os_type, os_version = S.os_version, app_version = S.app_version,
-    device_model = S.device_model, country = S.country, language = S.language,
-    is_secondary = S.is_secondary, is_developer = S.is_developer,
-    has_agreed_terms = S.has_agreed_terms, is_privacy = S.is_privacy,
-    auth_corporation = S.auth_corporation, auth_individual = S.auth_individual,
-    connected_car_state = S.connected_car_state, connected_car_seq = S.connected_car_seq,
-    is_workplace_linked = S.is_workplace_linked, demo_company_name = S.demo_company_name,
     last_login_at = S.last_login_at, last_login_date = S.last_login_date,
     created_at = S.created_at, updated_at = S.updated_at, loaded_at = CURRENT_TIMESTAMP()
   WHEN NOT MATCHED THEN INSERT ROW;
@@ -270,10 +261,7 @@ BEGIN
   ON T.department_seq = S.department_seq
   WHEN MATCHED AND S.updated_at > T.updated_at THEN UPDATE SET
     company_seq = S.company_seq, parent_department_seq = S.parent_department_seq,
-    depth = S.depth, department_name = S.department_name,
-    department_full_name = S.department_full_name,
-    is_workplace_linked = S.is_workplace_linked,
-    created_at = S.created_at, updated_at = S.updated_at, loaded_at = CURRENT_TIMESTAMP()
+    depth = S.depth, created_at = S.created_at, updated_at = S.updated_at, loaded_at = CURRENT_TIMESTAMP()
   WHEN NOT MATCHED THEN INSERT ROW;
   SET dept_cnt = @@row_count;
 

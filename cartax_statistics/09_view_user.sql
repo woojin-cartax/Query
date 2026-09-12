@@ -50,29 +50,12 @@ WITH u AS (
     COUNTIF(created_at >= DATETIME_SUB(CURRENT_DATETIME("Asia/Seoul"), INTERVAL 90 DAY))
                                                       AS user_added_90d,
 
-    /* 약관 미동의 = 가입 절차를 끝내지 않은 사람 */
-    COUNTIF(NOT has_agreed_terms)                     AS user_not_agreed,
-
-    /* 커넥티드카 연결. 제휴 기능 채택 */
-    COUNTIF(IFNULL(connected_car_state, 'N') NOT IN ('N', 'R'))
-                                                      AS user_connected_car,
-
-    /* 기기 변경 횟수 합. 잦으면 지원 부담이 크다는 신호일 수 있다 */
-    SUM(IFNULL(device_change_count, 0))               AS device_change_total,
-
     /* 이메일 도메인 구성. 포털 도메인만 쓰면 회사 도메인이 없는 소규모다 */
     COUNT(DISTINCT email_domain)                      AS email_domain_count,
     COUNTIF(email_domain IN ('naver.com','gmail.com','daum.net','hanmail.net',
                              'nate.com','kakao.com','outlook.com','hotmail.com',
                              'yahoo.com','icloud.com'))
-                                                      AS user_portal_email,
-
-    /* OS 구성 */
-    COUNTIF(os_type = 'iOS')                          AS user_ios,
-    COUNTIF(os_type = 'Android')                      AS user_android,
-
-    /* 워크플레이스 연동 */
-    COUNTIF(is_workplace_linked)                      AS user_workplace_linked
+                                                      AS user_portal_email
   FROM `carbiz-6f7fc.cartax_statistics.raw_user`
   GROUP BY company_seq
 ),
@@ -81,8 +64,7 @@ d AS (
   SELECT
     company_seq,
     COUNT(*)                                          AS department_count,
-    MAX(depth)                                        AS department_max_depth,
-    COUNTIF(is_workplace_linked)                      AS department_workplace_linked
+    MAX(depth)                                        AS department_max_depth
   FROM `carbiz-6f7fc.cartax_statistics.raw_department`
   GROUP BY company_seq
 )
@@ -108,18 +90,11 @@ SELECT
   u.first_user_created_at,
   u.last_user_created_at,
   IFNULL(u.user_added_90d, 0)           AS user_added_90d,
-  IFNULL(u.user_not_agreed, 0)          AS user_not_agreed,
-  IFNULL(u.user_connected_car, 0)       AS user_connected_car,
-  IFNULL(u.device_change_total, 0)      AS device_change_total,
   IFNULL(u.email_domain_count, 0)       AS email_domain_count,
   IFNULL(u.user_portal_email, 0)        AS user_portal_email,
-  IFNULL(u.user_ios, 0)                 AS user_ios,
-  IFNULL(u.user_android, 0)             AS user_android,
-  IFNULL(u.user_workplace_linked, 0)    AS user_workplace_linked,
 
   IFNULL(d.department_count, 0)         AS department_count,
   IFNULL(d.department_max_depth, 0)     AS department_max_depth,
-  IFNULL(d.department_workplace_linked, 0) AS department_workplace_linked,
 
   /* ── 판정 ──────────────────────────────────────────────────────────
      라이선스를 산 만큼 쓰고 있나. 1을 넘으면 초과, 낮으면 놀고 있는 것이다.

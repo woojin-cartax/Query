@@ -183,9 +183,7 @@ SELECT
   COUNT(DISTINCT u.company_seq)                       AS companies,
   COUNTIF(u.enabled_state = 'Y')                      AS active_users,
   COUNTIF(a.user_uid IS NOT NULL)                     AS has_admin_login,
-  ROUND(COUNTIF(a.user_uid IS NOT NULL) / COUNT(*) * 100, 1) AS admin_login_pct,
-  COUNTIF(u.is_secondary)                             AS secondary_users,
-  COUNTIF(u.is_developer)                             AS developer_users
+  ROUND(COUNTIF(a.user_uid IS NOT NULL) / COUNT(*) * 100, 1) AS admin_login_pct
 FROM `carbiz-6f7fc.cartax_statistics.raw_user` u
 LEFT JOIN (
   SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
@@ -228,12 +226,13 @@ WHERE v.user_count_total != s.user_count
 ORDER BY ABS(v.user_count_active - s.user_count) DESC LIMIT 50;
 
 
-/* ── 15. 부서명에 사람 이름이 섞이는지 ───────────────────────────────
-   부서명은 개인정보가 아니지만 소규모 회사에서 「홍길동팀」처럼 들어올 수 있다.
-   한글 2~3자 + 팀/파트 패턴을 세어 규모를 가늠한다. */
+/* ── 15. 부서 구조 ───────────────────────────────────────────────────
+   부서를 만든 기업이 얼마나 되고 계층이 몇 단계까지 가는지.
+   (부서명은 수집하지 않으므로 이름 관련 점검은 없다.) */
 SELECT
   COUNT(*)                                          AS departments,
-  COUNTIF(REGEXP_CONTAINS(department_name, r'^[가-힣]{2,4}(팀|파트|님|씨)$')) AS looks_personal,
+  COUNT(DISTINCT company_seq)                       AS companies_with_department,
   COUNTIF(depth = 0)                                AS root_departments,
-  MAX(depth)                                        AS max_depth
+  MAX(depth)                                        AS max_depth,
+  APPROX_QUANTILES(depth, 4)                        AS depth_quartiles
 FROM `carbiz-6f7fc.cartax_statistics.raw_department`;
