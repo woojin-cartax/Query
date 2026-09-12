@@ -323,3 +323,25 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_department`
 )
 CLUSTER BY company_seq
 OPTIONS (description = '부서. MySQL department. 부서 개수와 계층 깊이만 본다. 부서명은 수집하지 않는다.');
+
+
+/* ── purpose — 운행목적 정의. 기업별이다 ─────────────────────────────
+   해석은 (company_seq, 코드) 쌍으로 한다. 코드만으로 묶으면 서로 다른 목적이
+   한 덩어리가 된다.                                                      */
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_purpose`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_purpose`
+(
+  purpose_seq              INT64    NOT NULL,
+  company_seq              INT64,
+  purpose_code             STRING,
+  purpose_type             STRING,
+  purpose_name             STRING,
+  is_default               BOOL,
+  purpose_state            STRING,  -- Y활성 N비활성 X삭제
+  is_general_business      BOOL,    -- 국세청 양식의 일반업무 포함 여부
+  created_at               DATETIME,
+  updated_at               DATETIME,
+  loaded_at                TIMESTAMP
+)
+CLUSTER BY company_seq, purpose_code
+OPTIONS (description = '운행목적 정의. MySQL purpose. 기업별 정의라 해석은 (company_seq, 코드) 쌍으로 한다.');

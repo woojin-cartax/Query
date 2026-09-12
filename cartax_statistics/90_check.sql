@@ -238,18 +238,52 @@ SELECT
 FROM `carbiz-6f7fc.cartax_statistics.raw_department`;
 
 
-/* ── 16. purpose_code 가 무엇과 대응하나 ─────────────────────────────
-   drivingLog.purpose 는 varchar(50) 코드다. purpose 테이블에 후보가 셋 있다.
-     purposeCode varchar(20)  운행목적 코드
-     purposeType varchar(20)  운행목적 타입
-     purposeName varchar(20)  운행목적 이름
-   어느 것과 붙는지 확인하기 전에는 이름으로 번역하지 않는다.
+/* ── 16. purpose_code 의 조인 키 확정 ────────────────────────────────
+   drivingLog.purpose 가 purpose 테이블의 무엇과 붙는지 세 후보의 매칭률을 잰다.
+   가장 높은 것이 조인 키다. 07_view_trip.sql 의 ON 절을 그것으로 확정한다.
 
-   ※ purpose 테이블에 companySeq 가 있다. 같은 코드가 기업마다 다른 뜻일 수
-     있다는 뜻이다. 해석은 반드시 (company_seq, purpose_code) 쌍으로 한다.
-     코드만으로 전사 집계하면 서로 다른 목적이 한 덩어리가 된다.
+   ※ 매칭은 반드시 company_seq 를 함께 건다. 운행목적은 기업별 정의라
+     코드만으로 맞추면 A사 코드에 B사 이름이 붙는다. 그건 NULL 로도 안 드러나고
+     그럴듯한 값이 나와서 더 위험하다. 아래 by_code_only 가 그 위험의 크기다 —
+     with_company 와 차이가 크면 코드가 기업 간에 실제로 겹치고 있다는 뜻이다. */
+WITH t AS (
+  SELECT company_seq, purpose_code, COUNT(*) AS row_cnt
+  FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+  WHERE trip_date >= '2016-01-01' AND purpose_code IS NOT NULL
+  GROUP BY company_seq, purpose_code
+)
+SELECT
+  SUM(t.row_cnt)                                    AS total_rows,
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+         WHERE p.company_seq = t.company_seq AND p.purpose_code = t.purpose_code),
+         t.row_cnt, 0))                             AS match_by_code,
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+         WHERE p.company_seq = t.company_seq AND p.purpose_type = t.purpose_code),
+         t.row_cnt, 0))                             AS match_by_type,
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+         WHERE p.company_seq = t.company_seq AND p.purpose_name = t.purpose_code),
+         t.row_cnt, 0))                             AS match_by_name,
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+         WHERE p.purpose_code = t.purpose_code),
+         t.row_cnt, 0))                             AS match_by_code_only
+FROM t;
 
-   purpose 테이블을 아직 반입하지 않아 지금은 분포만 본다. */
+
+/* ── 16b. 같은 코드가 기업마다 다른 뜻인가 ───────────────────────────
+   한 코드에 이름이 둘 이상 붙어 있으면, 코드만으로 전사 집계할 수 없다.
+   그 개수가 크면 대시보드에서 운행목적을 전사 비교하는 것 자체가 무의미하다. */
+SELECT
+  purpose_code,
+  COUNT(DISTINCT purpose_name)                      AS distinct_names,
+  COUNT(DISTINCT company_seq)                       AS companies,
+  ARRAY_AGG(DISTINCT purpose_name IGNORE NULLS LIMIT 8) AS sample_names
+FROM `carbiz-6f7fc.cartax_statistics.raw_purpose`
+GROUP BY purpose_code
+HAVING COUNT(DISTINCT purpose_name) > 1
+ORDER BY distinct_names DESC LIMIT 30;
+
+
+/* ── 16c. 운행에 쓰인 코드 분포 ─────────────────────────────────────── */
 SELECT
   purpose_code,
   COUNT(*)                                          AS row_cnt,

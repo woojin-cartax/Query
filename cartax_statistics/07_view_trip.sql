@@ -30,7 +30,10 @@ SELECT
   t.gps_distance,
   t.connected_car_distance,
   t.driving_time,
-  t.purpose_code,        -- 코드 그대로. 이름 해석은 purpose 테이블이 와야 한다
+  t.purpose_code,
+  p.purpose_name,        -- ※ 조인 키 미확정. 아래 주석 참조
+  p.purpose_type,
+  p.is_general_business, -- 국세청 양식의 일반업무 포함 여부
   t.driving_type,
   t.approval_status,
   t.app_version,
@@ -86,4 +89,22 @@ SELECT
   t.overlap_state,
   t.created_at,
   t.updated_at
-FROM `carbiz-6f7fc.cartax_statistics.raw_trip` t;
+FROM `carbiz-6f7fc.cartax_statistics.raw_trip` t
+
+/* ── 운행목적 이름 붙이기 ──────────────────────────────────────────────
+   ★ 조인 키가 아직 확정되지 않았다.
+     drivingLog.purpose 가 purpose 테이블의 purposeCode / purposeType /
+     purposeName 중 무엇과 붙는지 확인되지 않았다. 지금은 purpose_code 로
+     걸어 뒀다. 90_check.sql 16번이 세 후보의 매칭률을 재므로, 결과를 보고
+     아래 ON 절의 컬럼을 확정한다. 틀렸으면 purpose_name 이 대부분 NULL 로
+     나오므로 조용히 넘어가지는 않는다.
+
+   ★ company_seq 를 반드시 함께 건다.
+     운행목적은 기업별 정의다. 코드만으로 조인하면 A사의 코드에 B사의 이름이
+     붙는다. 이건 NULL 로도 안 드러나고 그럴듯한 값이 나오기 때문에 더 위험하다.
+
+   purpose_state = 'X'(삭제)인 정의도 남긴다. 과거 운행이 그 목적으로 기록됐고,
+   지금 지워졌다고 해서 그때 기록이 없어지는 것은 아니다.                     */
+LEFT JOIN `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+  ON  t.company_seq  = p.company_seq
+  AND t.purpose_code = p.purpose_code;

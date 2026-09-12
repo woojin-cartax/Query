@@ -17,7 +17,8 @@ DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 1 D
 
 DECLARE trip_cnt, payment_cnt, schedule_cnt, paystate_cnt,
         paystate_hist_cnt, trial_cnt, company_cnt, deleted_cnt,
-        login_admin_cnt, login_app_cnt, user_cnt, dept_cnt INT64 DEFAULT 0;
+        login_admin_cnt, login_app_cnt, user_cnt, dept_cnt,
+        purpose_cnt INT64 DEFAULT 0;
 
 /* raw_trip 은 require_partition_filter = TRUE 다. MERGE 의 ON 절과 UPDATE 의
    WHERE 절에 파티션 컬럼(trip_date) 범위를 반드시 걸어야 한다.
@@ -250,6 +251,20 @@ BEGIN
   WHEN NOT MATCHED THEN INSERT ROW;
   SET dept_cnt = @@row_count;
 
+  /* ── purpose ─────────────────────────────────────────────────────── */
+  MERGE `carbiz-6f7fc.cartax_statistics.raw_purpose` T
+  USING (SELECT * EXCEPT(dt), CURRENT_TIMESTAMP() AS loaded_at
+    FROM `carbiz-6f7fc.cartax_statistics.ext_purpose` WHERE dt = target_dt) S
+  ON T.purpose_seq = S.purpose_seq
+  WHEN MATCHED AND S.updated_at > T.updated_at THEN UPDATE SET
+    company_seq = S.company_seq, purpose_code = S.purpose_code,
+    purpose_type = S.purpose_type, purpose_name = S.purpose_name,
+    is_default = S.is_default, purpose_state = S.purpose_state,
+    is_general_business = S.is_general_business,
+    created_at = S.created_at, updated_at = S.updated_at, loaded_at = CURRENT_TIMESTAMP()
+  WHEN NOT MATCHED THEN INSERT ROW;
+  SET purpose_cnt = @@row_count;
+
   /* ── 실행 기록 ───────────────────────────────────────────────────── */
   INSERT INTO `carbiz-6f7fc.cartax_statistics.query_run_log`
   SELECT target_dt, 'cartax_statistics_merge', tbl, IF(cnt = 0, 'EMPTY', 'SUCCESS'),
@@ -266,7 +281,8 @@ BEGIN
     ('raw_login_admin',                  login_admin_cnt),
     ('raw_login_app',                 login_app_cnt),
     ('raw_user',                      user_cnt),
-    ('raw_department',                dept_cnt)
+    ('raw_department',                dept_cnt),
+    ('raw_purpose',                   purpose_cnt)
   ]);
 
 EXCEPTION WHEN ERROR THEN

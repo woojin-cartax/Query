@@ -465,3 +465,33 @@ SELECT
     updateTime                        AS updated_at
 FROM department
 WHERE updateTime >= :from AND updateTime < :to;
+
+
+/* ---------------------------------------------------------------------------
+   [2순위] purpose — 운행목적 정의. 기업마다 따로 만든다
+   drivingLog.purpose 가 코드로 들어오는데 그것을 해석할 유일한 테이블이다.
+
+   ★ companySeq 가 있다. 운행목적은 전사 공통이 아니라 기업별 정의다.
+     같은 코드가 기업마다 다른 뜻일 수 있으므로 해석은 반드시
+     (company_seq, 코드) 쌍으로 한다. 코드만으로 전사 집계하면 서로 다른
+     목적이 한 덩어리가 된다.
+
+   ※ drivingLog.purpose 가 셋 중 무엇과 붙는지 아직 확인되지 않았다.
+     purposeCode / purposeType / purposeName 을 다 받아서 90_check.sql 16번으로
+     매칭률을 재고, 확인된 쪽으로 07_view_trip.sql 의 조인 키를 확정한다.
+
+   [가져오지 않는다] sort (화면 표시 순서. 분석에 안 쓴다)
+   ------------------------------------------------------------------------- */
+SELECT
+    seq                               AS purpose_seq,
+    companySeq                        AS company_seq,
+    purposeCode                       AS purpose_code,
+    purposeType                       AS purpose_type,
+    purposeName                       AS purpose_name,
+    (purposeDefault = 'Y')            AS is_default,
+    purposeState                      AS purpose_state,      -- Y활성 N비활성 X삭제
+    (isGenerally = 1)                 AS is_general_business,-- 국세청 양식의 일반업무 포함 여부
+    createTime                        AS created_at,
+    updateTime                        AS updated_at
+FROM purpose
+WHERE updateTime >= :from AND updateTime < :to;

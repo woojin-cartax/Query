@@ -54,6 +54,7 @@ MySQL ──00──▶ parquet ──▶ gs://cartax-biz_cartax_statistics/<테
 | `company` | `company` | 2 | 사업자등록번호·업종·가입경로·GA clientId |
 | `user_history` | `user` | 1 | uid → 기업 대응. 42컬럼 중 13개 |
 | 부서 | `department` | 2 | 개수와 계층 깊이만. 부서명은 안 받는다 |
+| 운행목적 | `purpose` | 2 | `trip.purpose_code` 해석. **기업별 정의다** |
 | 관리자 로그인 | `loginBrowserHistory` | 1 | 비즈 관리자 페이지. 성공·실패·referer |
 | 앱 로그인 | `userLoginHistory` | 1 | 기기·OS·앱 버전. `has_app_login` |
 | `vehicle_history` | `car` | 3 | 이탈 선행지표 아님이 실증됨. 나중에 |
@@ -188,12 +189,13 @@ X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적
   파티션·클러스터 판단이 달라진다. `90_check.sql` 10번.
 - **`loginBrowserHistory.parent`** varchar(45), 주석 없음. 의미 미확인이라 뺐다.
 - **`payment.type`** 샘플이 전부 `'SC0999'`. 의미 미확인.
-- **`purpose_code` 의 해석.** `drivingLog.purpose` 는 이름이 아니라 코드다.
-  `purpose` 테이블(11컬럼, 시트에 있음)에 후보가 셋이다 —
-  `purposeCode` / `purposeType` / `purposeName`. 어느 것과 붙는지 미확인.
-  **그 테이블에 `companySeq` 가 있다.** 같은 코드가 기업마다 다른 뜻일 수 있으니
-  해석은 `(company_seq, purpose_code)` 쌍으로 해야 한다. 코드만으로 전사 집계하면
-  서로 다른 목적이 한 덩어리가 된다. `90_check.sql` 16번.
+- **`purpose` 조인 키.** `drivingLog.purpose` 가 `purposeCode` / `purposeType` /
+  `purposeName` 중 무엇과 붙는지 미확인. `07_view_trip.sql` 은 일단 `purpose_code`
+  로 걸어 뒀다. `90_check.sql` 16번이 세 후보의 매칭률을 재므로 그 결과로 확정한다.
+  틀렸으면 `purpose_name` 이 대부분 NULL 로 나와 조용히 넘어가지 않는다.
+  **조인에 `company_seq` 를 반드시 함께 건다.** 운행목적은 기업별 정의라 코드만으로
+  조인하면 A사 코드에 B사 이름이 붙는다 — NULL 로도 안 드러나고 그럴듯한 값이
+  나와서 더 위험하다. 겹침 규모는 `90_check.sql` 16b.
 - **`createTime` 신뢰 구간.** `payment` seq 1~10 의 `createTime` 이 전부
   `2017-05-15 19:48:10` 인데 `beginDate` 는 2016년이다. 그 시점에 데이터를 이관한
   흔적이다. 이전 행의 `createTime` 은 생성 시각이 아니다. `90_check.sql` 7번.

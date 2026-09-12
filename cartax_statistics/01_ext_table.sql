@@ -97,6 +97,13 @@ OPTIONS (format = 'PARQUET',
   hive_partition_uri_prefix = 'gs://cartax-biz_cartax_statistics/department/',
   require_hive_partition_filter = TRUE);
 
+CREATE OR REPLACE EXTERNAL TABLE `carbiz-6f7fc.cartax_statistics.ext_purpose`
+WITH PARTITION COLUMNS (dt DATE)
+OPTIONS (format = 'PARQUET',
+  uris = ['gs://cartax-biz_cartax_statistics/purpose/dt=*'],
+  hive_partition_uri_prefix = 'gs://cartax-biz_cartax_statistics/purpose/',
+  require_hive_partition_filter = TRUE);
+
 -- ── 3순위 — 1·2순위 적재가 안정된 뒤에 만든다 ────────────────────────────
 -- CREATE OR REPLACE EXTERNAL TABLE `carbiz-6f7fc.cartax_statistics.ext_vehicle`
 -- WITH PARTITION COLUMNS (dt DATE)
