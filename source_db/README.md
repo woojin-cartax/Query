@@ -23,6 +23,7 @@
 | `04_view_payment.sql` | BigQuery | 결제 사실 뷰. 성공·실패·환불·시도 성격 판정 |
 | `05_view_company.sql` | BigQuery | 기업 마스터 + 현재 결제 상태 |
 | `06_view_trip.sql` | BigQuery | 운행 뷰. 「운행 1건」의 정의 |
+| `07_view_login.sql` | BigQuery | 기업별 로그인 요약. PC·앱, 실패, 사용자 확산 |
 | `50_run_log.sql` | BigQuery | 실행 기록 테이블 |
 | `90_check.sql` | BigQuery | 점검. 아무것도 바꾸지 않는다 |
 
@@ -49,6 +50,8 @@ MySQL ──00──▶ parquet ──▶ gs://cartax-biz_source_db/<테이블>/
 | 현재 결제 상태 | `companyPayState` (+`History`) | 1 | 설계안의 「현재 상태 15개」를 통째로 대체 |
 | 체험 | `freeExperienceHistory` | 1 | |
 | `company` | `company` | 2 | 사업자등록번호·업종·가입경로·GA clientId |
+| PC 로그인 | `loginBrowserHistory` | 1 | 성공·실패·referer. 설계안 05번의 `pc_*` 전부 |
+| 앱 로그인 | `userLoginHistory` | 1 | 기기·OS·앱 버전. `has_app_login` |
 | `vehicle_history` | `car` | 3 | 이탈 선행지표 아님이 실증됨. 나중에 |
 | `cancel_reason` | **없음** | 1 | 아래 참조 |
 | `user_history` | **없음** | 3 | 아래 참조 |
@@ -91,17 +94,64 @@ GA4의 `user_pseudo_id` 와 이어지면 마케팅 유입 → 가입이 한 줄�
 **⑥ 카택스 케어가 별도 상품이다.** `paySchedule.type = 'cartaxCare'`.
 매출 분석에서 요금제(`pricePlan`)와 분리해야 한다.
 
+**⑦ 로그인 이력이 두 벌 있다.** (2026-09-12 추가)
+설계안 05번에서 「받아야 한다」고 쓴 `pc_first_login_date` / `pc_last_login_date` /
+`pc_login_count_total` / `has_app_login` 이 전부 계산된다. 받을 필요가 없다.
+그 이상으로 원천에만 있는 것이 둘이다.
+
+- **로그인 실패** — `loginBrowserHistory.success` + `errorMsg`.
+  반복 실패 기업은 제품이 불만인 게 아니라 들어오질 못하고 있다. 이탈 원인이 갈린다.
+- **유입 경로** — `loginBrowserHistory.referer`.
+- **기기·OS·앱 버전** — `userLoginHistory` 가 로그인마다 남긴다. 버전 채택 추적.
+
+주의할 점이 둘 있다.
+`userLoginHistory` 에는 **`updateTime` 이 없다.** append-only 라 증분 기준이
+`createTime` 이다. 다른 테이블과 다르다.
+그리고 **`companySeq` 가 없다.** `uid` 뿐이라 기업에 붙이려면 user 테이블이 필요하다.
+`07_view_login.sql` 은 임시로 운행 기록(`userUid` + `companySeq`)으로 잇는데,
+운행을 한 번도 안 한 사용자가 빠진다. user 테이블을 받으면 그 CTE 를 갈아끼운다.
+
 ## 원천에 없어서 확인이 필요한 것
 
 | 무엇 | 왜 필요한가 | 상태 |
 |---|---|---|
-| **탈퇴·자동결제 해지 사유** | 설계안 1순위. 다른 어디서도 만들 수 없는 유일한 질적 데이터 | 받은 시트에 없다. 별도 테이블인지 확인 필요 |
-| **사용자(user) 테이블** | `user_count`, 로그인 이력, 확산 분석 | 시트에 없다. `drivingSetting.userUid` 로 존재는 확인됨 |
-| **로그인 이력** | `pc_login_count_total`, `has_app_login` | `company.lastLogin` 은 단일 값. 이력 테이블이 따로 있는지 |
+| **탈퇴·자동결제 해지 사유** | 설계안 1순위. 다른 어디서도 만들 수 없는 유일한 질적 데이터 | **552컬럼 전수 검색했으나 없다.** 아래 참조 |
+| **사용자(user) 테이블** | 등록 사용자 수, uid → 기업 대응 | 시트에 없다. `drivingSetting.userUid` 로 존재는 확인됨 |
 | **부서(department)** | `departmentSeq` 의 해석 | 시트에 없다 |
+
+### 해지·탈퇴 사유를 552컬럼에서 찾은 결과
+
+이름과 주석 전체를 `사유 / 해지 / 취소 / 탈퇴 / reason / cancel` 로 훑었다.
+**사유 텍스트나 선택지 코드가 들어가는 컬럼은 하나도 없다.** 날짜와 상태만 있다.
+
+| 있는 것 | 무엇 |
+|---|---|
+| `companyPayState.freeCancelDate` | 무료체험 중 구독 취소한 **날짜** |
+| `payment.state = 'Cancel'` | 결제 취소 **상태** |
+| `paySchedule.status = 'C'` | 예약 취소 **상태** |
+| `paySchedule.errorMsg` | **결제 실패** 사유 — 해지 사유가 아니다 |
+| `loginBrowserHistory.errorMsg` | **로그인 실패** 사유 |
+
+후보가 하나 있다. `payment.memo` (text, 주석 없음). 자유 입력이라 무엇을 담는지
+모른다. 값을 확인해 볼 가치는 있다. 그 외에는 **별도 테이블일 수밖에 없다.**
+
+### 탈퇴 판정 — 대리지표를 쓰지 않는다
+
+`company.enabled` enum('Y','N','X') 에 **X = 탈퇴**가 명시돼 있다.
+90일 스냅샷에서 `user_count = 0` 을 대리지표로 쓴 것은 그 원본에 탈퇴 컬럼이
+없었기 때문이다. 이제 직접 신호가 있으므로 대리지표를 쓰지 않는다.
+
+다만 **N(미사용)이 무엇인지 모른다.** 관리자 정지인지, 결제 만료 강등인지.
+X 와 N 을 묶으면 안 된다. `90_check.sql` 8번으로 셋의 활동 흔적을 비교한다.
 
 ## 확정되지 않은 것
 
+- **`company.enabled = 'N'`(미사용)의 정체.** X(탈퇴)와 묶으면 안 된다. `90_check.sql` 8번.
+- **PC 와 앱의 `uid` 가 같은 체계인가.** `07_view_login.sql` 이 둘 중 큰 쪽을
+  사용자 수로 쓴다. 체계가 다르면 그 계산이 틀린다. `90_check.sql` 11번.
+- **로그인 이력 규모.** 앱 로그인이 앱 실행마다 남으면 운행보다 클 수도 있다.
+  파티션·클러스터 판단이 달라진다. `90_check.sql` 10번.
+- **`loginBrowserHistory.parent`** varchar(45), 주석 없음. 의미 미확인이라 뺐다.
 - **`plan_level` 숫자 ↔ 요금제 이름.** 샘플에서 1·2·3 이 관찰됐으나 대응이 확인되지 않았다.
   기존 `signup_90days` 의 FREE/PLUS/PREMIUM 과 맞춰야 한다. `90_check.sql` 4번.
 - **`payment.type`** 샘플이 전부 `'SC0999'`. 의미 미확인.
@@ -127,6 +177,12 @@ GA4의 `user_pseudo_id` 와 이어지면 마케팅 유입 → 가입이 한 줄�
 | 운행 주소·좌표 (`startAddress`, `stopAddress`, 위경도 4개) | 제외 |
 | 자유 입력 (`bigo`, `adminMemo`, `cartaxMemo`, `car.memo`) | 제외 |
 | 차량번호 (`car.number`) | 제외 (준식별자) |
+| 로그인 IP (`loginBrowserHistory.clientIp`) | 제외 (암호화돼 있어도 쓸 분석이 없다) |
+| userAgent raw (`loginBrowserHistory.userAgent`) | 제외 (platform/browser/version 으로 파싱돼 있다) |
+
+`loginBrowserHistory.referer` 는 가져온다. 유입 경로 분석에 직결되기 때문이다.
+다만 URL 쿼리 파라미터에 이메일·토큰이 실려 올 수 있다. `90_check.sql` 9번으로
+확인하고, 섞여 있으면 호스트만 남기도록 바꾼다.
 
 예외가 하나 있다. `paySchedule.errorMsg`(결제 실패 사유)는 자유 텍스트인데 가져온다.
 결제 실패의 유일한 기록이기 때문이다. PG 응답 메시지로 보이지만 확인되지 않았다.
@@ -139,7 +195,7 @@ GA4의 `user_pseudo_id` 와 이어지면 마케팅 유입 → 가입이 한 줄�
 
 1. `signup_90days` 의 월별 집계를 뷰에서 테이블로 (새 데이터 들어오기 전에)
 2. `50_run_log.sql` → `02_raw_table.sql` → `01_ext_table.sql`
-3. `payment` 계열부터 적재. 작고 매출·이탈 분석이 즉시 열린다
+3. `payment` 계열 + 로그인 이력부터 적재. 작고 매출·이탈 분석이 즉시 열린다
 4. `90_check.sql` 로 판정 검증 → 뷰 수정
 5. `trip` 최초 전량 (연도별 분할, 회당 약 477 MB)
 6. 증분 적재 시작. 90일 스냅샷과 병행

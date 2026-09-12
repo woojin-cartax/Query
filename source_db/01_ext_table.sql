@@ -61,6 +61,20 @@ OPTIONS (format = 'PARQUET',
   hive_partition_uri_prefix = 'gs://cartax-biz_source_db/trip_deleted/',
   require_hive_partition_filter = TRUE);
 
+CREATE OR REPLACE EXTERNAL TABLE `carbiz-6f7fc.source_db.ext_login_pc`
+WITH PARTITION COLUMNS (dt DATE)
+OPTIONS (format = 'PARQUET',
+  uris = ['gs://cartax-biz_source_db/login_pc/dt=*'],
+  hive_partition_uri_prefix = 'gs://cartax-biz_source_db/login_pc/',
+  require_hive_partition_filter = TRUE);
+
+CREATE OR REPLACE EXTERNAL TABLE `carbiz-6f7fc.source_db.ext_login_app`
+WITH PARTITION COLUMNS (dt DATE)
+OPTIONS (format = 'PARQUET',
+  uris = ['gs://cartax-biz_source_db/login_app/dt=*'],
+  hive_partition_uri_prefix = 'gs://cartax-biz_source_db/login_app/',
+  require_hive_partition_filter = TRUE);
+
 -- ── 2순위 ────────────────────────────────────────────────────────────────
 CREATE OR REPLACE EXTERNAL TABLE `carbiz-6f7fc.source_db.ext_company`
 WITH PARTITION COLUMNS (dt DATE)

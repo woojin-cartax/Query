@@ -82,3 +82,75 @@ SELECT DATE(created_at) AS created_date, COUNT(*) AS row_cnt,
        MIN(contract_begin_date) AS min_begin, MAX(contract_begin_date) AS max_begin
 FROM `carbiz-6f7fc.source_db.raw_payment`
 GROUP BY created_date ORDER BY row_cnt DESC LIMIT 10;
+
+
+/* ── 8. 탈퇴 판정 — enabled 3값이 실제로 무엇인지 ─────────────────────
+   90일 스냅샷에서는 탈퇴 컬럼이 없어 user_count = 0 을 대리지표로 썼다.
+   이제 company.enabled 에 X(탈퇴)가 명시돼 있다. 대리지표가 필요 없다.
+
+   다만 N(미사용)이 무엇인지 모른다. 관리자가 정지시킨 것인지,
+   결제 만료로 내려간 것인지. X 와 N 을 묶으면 안 된다.
+   활동 흔적과 교차해서 셋이 실제로 어떻게 다른지 본다. */
+SELECT
+  c.enabled_state,
+  COUNT(*)                                          AS companies,
+  COUNTIF(l.active_user_count = 0)                  AS no_active_user,
+  COUNTIF(l.pc_login_count = 0 AND l.app_login_count = 0) AS never_logged_in,
+  ROUND(AVG(l.days_since_last_login), 0)            AS avg_days_since_login,
+  COUNTIF(s.contract_end_date < CURRENT_DATE("Asia/Seoul")) AS contract_expired,
+  COUNTIF(s.is_auto_pay)                            AS auto_pay_on
+FROM `carbiz-6f7fc.source_db.raw_company` c
+LEFT JOIN `carbiz-6f7fc.source_db.view_login_company` l USING (company_seq)
+LEFT JOIN `carbiz-6f7fc.source_db.raw_company_pay_state` s USING (company_seq)
+GROUP BY c.enabled_state;
+
+
+/* ── 9. referer 에 개인정보가 붙는지 ──────────────────────────────────
+   유입 경로로 쓰려고 받는다. URL 쿼리 파라미터에 이메일·토큰이 실려 오면
+   수집을 중단하거나 호스트만 남기도록 바꾼다. */
+SELECT
+  REGEXP_EXTRACT(referer, r'^https?://([^/]+)')     AS host,
+  COUNT(*)                                          AS row_cnt,
+  COUNTIF(REGEXP_CONTAINS(referer, r'[?&]'))        AS has_query_param,
+  COUNTIF(REGEXP_CONTAINS(referer, r'@|token|email|passwd|pwd|key=')) AS looks_sensitive
+FROM `carbiz-6f7fc.source_db.raw_login_pc`
+WHERE created_at >= '2016-01-01' AND referer IS NOT NULL
+GROUP BY host ORDER BY row_cnt DESC LIMIT 30;
+
+
+/* ── 10. 로그인 이력 규모 ────────────────────────────────────────────
+   앱 로그인은 앱 실행마다 남을 수 있다. 그러면 운행보다 클 수도 있다.
+   증분 크기를 먼저 재고 파티션·클러스터가 맞는지 판단한다. */
+SELECT 'login_pc' AS tbl, EXTRACT(YEAR FROM created_at) AS yr, COUNT(*) AS row_cnt
+FROM `carbiz-6f7fc.source_db.raw_login_pc` WHERE created_at >= '2016-01-01'
+GROUP BY yr
+UNION ALL
+SELECT 'login_app', EXTRACT(YEAR FROM created_at), COUNT(*)
+FROM `carbiz-6f7fc.source_db.raw_login_app` WHERE created_at >= '2016-01-01'
+GROUP BY 2
+ORDER BY tbl, yr;
+
+
+/* ── 11. PC 와 앱의 uid 가 같은 체계인가 ──────────────────────────────
+   07번 뷰가 둘 중 큰 쪽을 사용자 수로 쓴다. 두 uid 집합이 아예 다른
+   체계라면 그 계산이 틀린다. 겹침을 먼저 확인한다. */
+WITH p AS (SELECT DISTINCT user_uid FROM `carbiz-6f7fc.source_db.raw_login_pc`
+           WHERE created_at >= '2016-01-01' AND user_uid IS NOT NULL),
+     a AS (SELECT DISTINCT user_uid FROM `carbiz-6f7fc.source_db.raw_login_app`
+           WHERE created_at >= '2016-01-01' AND user_uid IS NOT NULL)
+SELECT (SELECT COUNT(*) FROM p)                                  AS pc_uids,
+       (SELECT COUNT(*) FROM a)                                  AS app_uids,
+       (SELECT COUNT(*) FROM p JOIN a USING (user_uid))          AS both,
+       (SELECT COUNT(*) FROM a WHERE user_uid NOT IN (SELECT user_uid FROM
+          `carbiz-6f7fc.source_db.raw_trip` WHERE trip_date >= '2016-01-01'))
+                                                                 AS app_uid_without_trip;
+
+
+/* ── 12. 로그인 실패 사유 분포 ───────────────────────────────────────
+   반복 실패가 이탈로 이어지는지 보려면 사유를 먼저 알아야 한다.
+   errorMsg 에 개인정보가 섞이는지도 같이 본다. */
+SELECT error_message, COUNT(*) AS row_cnt,
+       COUNT(DISTINCT company_seq) AS companies
+FROM `carbiz-6f7fc.source_db.raw_login_pc`
+WHERE created_at >= '2016-01-01' AND NOT is_success
+GROUP BY error_message ORDER BY row_cnt DESC LIMIT 30;

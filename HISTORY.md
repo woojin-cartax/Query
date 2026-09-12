@@ -12,6 +12,42 @@
 
 ---
 
+## 2026-09-12 — 로그인 이력 2개 반입, 해지 사유 부재 확인
+
+`DB_list.xlsx` 에 `loginBrowserHistory`(PC) · `userLoginHistory`(앱)가 추가되어
+반입했다. 22개 시트 552컬럼이 됐다.
+
+설계안 05번에서 「받아야 한다」고 쓴 `pc_first_login_date` / `pc_last_login_date` /
+`pc_login_count_total` / `has_app_login` 이 전부 계산된다. 받을 필요가 없다.
+그 이상으로 원천에만 있는 것이 셋이다.
+
+- **로그인 실패** — `loginBrowserHistory.success` + `errorMsg`. 반복 실패 기업은
+  제품이 불만인 게 아니라 들어오질 못하고 있다. 이탈 원인 분류가 갈린다.
+- **유입 경로** — `referer`.
+- **기기·OS·앱 버전** — `userLoginHistory` 가 로그인마다 남긴다.
+
+주의점 둘. `userLoginHistory` 에는 `updateTime` 이 없어 증분 기준이 `createTime`
+이다(append-only). 그리고 `companySeq` 가 없어 `uid` 뿐이다. `07_view_login.sql` 은
+임시로 운행 기록으로 uid → 기업을 잇는데 운행을 한 번도 안 한 사용자가 빠진다.
+user 테이블을 받으면 그 CTE 를 갈아끼운다.
+
+**해지·탈퇴 사유는 552컬럼 전수 검색 결과 없다.** 이름과 주석을
+`사유/해지/취소/탈퇴/reason/cancel` 로 훑었고, 사유 텍스트나 선택지 코드가 들어가는
+컬럼은 하나도 없다. 날짜(`freeCancelDate`)와 상태(`payment.state='Cancel'`,
+`paySchedule.status='C'`)만 있다. `paySchedule.errorMsg` 는 결제 **실패** 사유지
+해지 사유가 아니다. 후보는 `payment.memo`(text, 주석 없음) 하나뿐이고, 그 외에는
+별도 테이블일 수밖에 없다. 설계안 1순위 항목이라 개발팀 확인이 필요하다.
+
+**탈퇴 판정에서 대리지표를 뺀다.** `company.enabled` 에 X(탈퇴)가 명시돼 있다.
+90일 스냅샷에서 `user_count = 0` 을 쓴 것은 그 원본에 탈퇴 컬럼이 없었기 때문이다.
+다만 N(미사용)이 관리자 정지인지 결제 만료 강등인지 모른다. X 와 N 을 묶으면 안 된다.
+
+점검 쿼리 5개 추가(8~12번): 탈퇴 3값 교차, referer 개인정보, 로그인 규모,
+PC·앱 uid 체계 일치, 로그인 실패 사유 분포.
+
+10개 테이블 전부 DDL 과 추출 쿼리의 컬럼 이름·순서 일치 확인. 드라이런 통과
+(`00_mysql_extract.sql` 은 MySQL 방언이라 대상 아님).
+
 ## 2026-09-12 — source_db 신설: 전체 고객사 원천 수집 1차 초안
 
 `docs/DB_list.xlsx`(MySQL 20개 테이블, 527컬럼, 주석 231개)를 받아 설계안 2판의

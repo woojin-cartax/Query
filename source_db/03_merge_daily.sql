@@ -16,7 +16,8 @@ DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 1 D
 --DECLARE target_dt DATE DEFAULT DATE('2026-09-01');   -- 소급 적재용 (주석 해제)
 
 DECLARE trip_cnt, payment_cnt, schedule_cnt, paystate_cnt,
-        paystate_hist_cnt, trial_cnt, company_cnt, deleted_cnt INT64 DEFAULT 0;
+        paystate_hist_cnt, trial_cnt, company_cnt, deleted_cnt,
+        login_pc_cnt, login_app_cnt INT64 DEFAULT 0;
 
 /* raw_trip 은 require_partition_filter = TRUE 다. MERGE 의 ON 절과 UPDATE 의
    WHERE 절에 파티션 컬럼(trip_date) 범위를 반드시 걸어야 한다.
@@ -24,6 +25,8 @@ DECLARE trip_cnt, payment_cnt, schedule_cnt, paystate_cnt,
    먼저 변수에 담아 상수처럼 쓴다. 배포 전 dry-run 으로 스캔 바이트를 확인할 것. */
 DECLARE trip_from, trip_to DATE;
 DECLARE del_from, del_to   DATE;
+DECLARE pc_from,  pc_to    DATETIME;
+DECLARE app_from, app_to   DATETIME;
 
 /* INSERT ROW 는 원본과 대상의 컬럼 이름·순서가 완전히 같아야 성립한다.
    raw_* 에만 있는 loaded_at 을 USING 절에서 만들어 붙이는 이유다.
@@ -41,6 +44,16 @@ BEGIN
     SELECT AS STRUCT IFNULL(MIN(trip_date), CURRENT_DATE("Asia/Seoul")),
                      IFNULL(MAX(trip_date), CURRENT_DATE("Asia/Seoul"))
     FROM `carbiz-6f7fc.source_db.ext_trip_deleted` WHERE dt = target_dt);
+
+  SET (pc_from, pc_to) = (
+    SELECT AS STRUCT IFNULL(MIN(created_at), CURRENT_DATETIME("Asia/Seoul")),
+                     IFNULL(MAX(created_at), CURRENT_DATETIME("Asia/Seoul"))
+    FROM `carbiz-6f7fc.source_db.ext_login_pc` WHERE dt = target_dt);
+
+  SET (app_from, app_to) = (
+    SELECT AS STRUCT IFNULL(MIN(created_at), CURRENT_DATETIME("Asia/Seoul")),
+                     IFNULL(MAX(created_at), CURRENT_DATETIME("Asia/Seoul"))
+    FROM `carbiz-6f7fc.source_db.ext_login_app` WHERE dt = target_dt);
 
   /* ── trip ────────────────────────────────────────────────────────────
      파티션 프루닝이 핵심이다. ON 절에만 trip_id 를 걸면 대상 테이블 전체를
@@ -200,6 +213,31 @@ BEGIN
   WHEN NOT MATCHED THEN INSERT ROW;
   SET company_cnt = @@row_count;
 
+  /* ── login_pc ────────────────────────────────────────────────────── */
+  MERGE `carbiz-6f7fc.source_db.raw_login_pc` T
+  USING (SELECT * EXCEPT(dt), CURRENT_TIMESTAMP() AS loaded_at
+    FROM `carbiz-6f7fc.source_db.ext_login_pc` WHERE dt = target_dt) S
+  ON  T.login_id = S.login_id
+  AND T.created_at BETWEEN pc_from AND pc_to
+  WHEN MATCHED AND S.updated_at > T.updated_at THEN UPDATE SET
+    company_seq = S.company_seq, company_code = S.company_code, user_uid = S.user_uid,
+    platform = S.platform, browser = S.browser, browser_version = S.browser_version,
+    referer = S.referer, is_success = S.is_success, error_message = S.error_message,
+    created_at = S.created_at, updated_at = S.updated_at, loaded_at = CURRENT_TIMESTAMP()
+  WHEN NOT MATCHED THEN INSERT ROW;
+  SET login_pc_cnt = @@row_count;
+
+  /* ── login_app ───────────────────────────────────────────────────
+     원본에 updateTime 이 없다. 로그인은 한 번 일어나면 고쳐지지 않는
+     append-only 사건이라 갱신 분기가 아예 없다. 새 행만 넣는다.          */
+  MERGE `carbiz-6f7fc.source_db.raw_login_app` T
+  USING (SELECT * EXCEPT(dt), CURRENT_TIMESTAMP() AS loaded_at
+    FROM `carbiz-6f7fc.source_db.ext_login_app` WHERE dt = target_dt) S
+  ON  T.login_id = S.login_id
+  AND T.created_at BETWEEN app_from AND app_to
+  WHEN NOT MATCHED THEN INSERT ROW;
+  SET login_app_cnt = @@row_count;
+
   /* ── 실행 기록 ───────────────────────────────────────────────────── */
   INSERT INTO `carbiz-6f7fc.source_db.query_run_log`
   SELECT target_dt, 'source_db_merge', tbl, IF(cnt = 0, 'EMPTY', 'SUCCESS'),
@@ -212,7 +250,9 @@ BEGIN
     ('raw_company_pay_state',         paystate_cnt),
     ('raw_company_pay_state_history', paystate_hist_cnt),
     ('raw_trial_history',             trial_cnt),
-    ('raw_company',                   company_cnt)
+    ('raw_company',                   company_cnt),
+    ('raw_login_pc',                  login_pc_cnt),
+    ('raw_login_app',                 login_app_cnt)
   ]);
 
 EXCEPTION WHEN ERROR THEN

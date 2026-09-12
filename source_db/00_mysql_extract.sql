@@ -348,3 +348,70 @@ SELECT
     updateTime                        AS updated_at
 FROM car
 WHERE updateTime >= :from AND updateTime < :to;
+
+
+/* ---------------------------------------------------------------------------
+   [1순위] loginBrowserHistory — PC·브라우저 로그인 이력
+   설계안의 pc_first_login_date / pc_last_login_date / pc_login_count_total 이
+   전부 여기서 나온다. 받을 필요 없이 우리가 계산한다.
+
+   success/errorMsg 로 로그인 실패까지 남는다. 실패가 반복되는 기업은
+   접근 자체가 막혀 있는 것이고, 이탈 원인이 제품 불만이 아니라 로그인일 수 있다.
+
+   referer 는 유입 경로다. 마케팅 분석에 직결된다.
+
+   [가져오지 않는다]
+     clientIp    암호화돼 있어도 로그인 시도 IP다. 쓸 분석이 없다
+     userAgent   raw 문자열. platform / browser / version 으로 이미 파싱돼 있다
+     parent      의미 미확인. 확인 후 필요하면 추가한다
+
+   ※ 원본 컬럼명이 updateTIme 다 (대문자 I). 오타지만 원본은 고칠 수 없다.
+     적재하면서 updated_at 으로 바로잡는다.
+   ------------------------------------------------------------------------- */
+SELECT
+    seq                               AS login_id,
+    companySeq                        AS company_seq,
+    cid                               AS company_code,
+    uid                               AS user_uid,
+    platform                          AS platform,
+    browser                           AS browser,
+    version                           AS browser_version,
+    referer                           AS referer,
+    (success = 1)                     AS is_success,
+    errorMsg                          AS error_message,
+    createTime                        AS created_at,
+    updateTIme                        AS updated_at        -- ★ 원본 오타. 그대로 읽어 바로잡는다
+FROM loginBrowserHistory
+WHERE updateTIme >= :from AND updateTIme < :to;
+
+
+/* ---------------------------------------------------------------------------
+   [1순위] userLoginHistory — 앱(모바일) 로그인 이력
+   설계안의 has_app_login 이 여기서 나온다. 그 이상으로, 기기·OS·앱 버전이
+   로그인마다 남아 버전 채택과 기기 교체를 추적할 수 있다.
+
+   ※ updateTime 이 없다. createTime 만 NOT NULL 이다.
+     로그인은 한 번 일어나면 고쳐지지 않는 append-only 사건이라 그렇다.
+     증분 기준을 createTime 으로 잡는다. 다른 테이블과 다르니 주의.
+
+   ※ companySeq 가 없다. uid 뿐이다.
+     기업에 붙이려면 uid → 기업 대응이 필요한데 user 테이블이 아직 없다.
+     임시로 drivingLog(userUid + companySeq)로 이을 수는 있으나 운행을 한 번도
+     안 한 사용자가 빠진다. user 테이블을 받는 것이 맞다.
+
+   [가져오지 않는다] 없음. 10컬럼 전부 분석에 쓴다.
+     deviceId 는 준식별자지만 기기 교체 추적에 필요해 유지한다.
+   ------------------------------------------------------------------------- */
+SELECT
+    seq                               AS login_id,
+    uid                               AS user_uid,
+    deviceId                          AS device_id,
+    osType                            AS os_type,           -- Android / iOS / ETC
+    osVersion                         AS os_version,
+    versionName                       AS app_version,
+    country                           AS country,
+    language                          AS language,
+    model                             AS device_model,
+    createTime                        AS created_at
+FROM userLoginHistory
+WHERE createTime >= :from AND createTime < :to;   -- ★ updateTime 이 없다

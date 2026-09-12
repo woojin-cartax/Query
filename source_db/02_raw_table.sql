@@ -254,3 +254,49 @@ CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_company`
 )
 CLUSTER BY company_seq, company_code
 OPTIONS (description = '기업 마스터. MySQL company. 인증정보·성명·연락처·자유입력 메모는 수집하지 않는다. 이메일은 도메인만, 주소는 시군구까지만.');
+
+
+/* ── login_pc — PC·브라우저 로그인 이력 ──────────────────────────────── */
+DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_login_pc`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_login_pc`
+(
+  login_id                 INT64    NOT NULL,
+  company_seq              INT64,
+  company_code             STRING,
+  user_uid                 STRING,
+  platform                 STRING,
+  browser                  STRING,
+  browser_version          STRING,
+  referer                  STRING,   -- 유입 경로
+  is_success               BOOL,
+  error_message            STRING,   -- 로그인 실패 사유
+  created_at               DATETIME,
+  updated_at               DATETIME, -- 원본 컬럼명은 updateTIme (오타). 적재하며 바로잡는다
+  loaded_at                TIMESTAMP
+)
+PARTITION BY DATETIME_TRUNC(created_at, MONTH)
+CLUSTER BY company_seq, user_uid
+OPTIONS (description = 'PC·브라우저 로그인 이력. MySQL loginBrowserHistory. IP·userAgent 는 수집하지 않는다.');
+
+
+/* ── login_app — 앱(모바일) 로그인 이력 ──────────────────────────────
+   ※ 원본에 updateTime 이 없다. append-only 라 증분 기준이 created_at 이다.
+   ※ company_seq 가 없다. user 테이블이 와야 기업에 붙는다.                 */
+DROP TABLE IF EXISTS `carbiz-6f7fc.source_db.raw_login_app`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.source_db.raw_login_app`
+(
+  login_id                 INT64    NOT NULL,
+  user_uid                 STRING,
+  device_id                STRING,
+  os_type                  STRING,   -- Android / iOS / ETC
+  os_version               STRING,
+  app_version              STRING,
+  country                  STRING,
+  language                 STRING,
+  device_model             STRING,
+  created_at               DATETIME,
+  loaded_at                TIMESTAMP
+)
+PARTITION BY DATETIME_TRUNC(created_at, MONTH)
+CLUSTER BY user_uid, created_at
+OPTIONS (description = '앱 로그인 이력. MySQL userLoginHistory. updateTime 이 없어 증분 기준이 created_at 이다.');
