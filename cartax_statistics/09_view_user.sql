@@ -12,11 +12,13 @@
    90일 스냅샷의 user_count 가 어느 것인지 확인해야 한다. 대조 시 이 셋을
    다 맞춰 보고 어느 것과 일치하는지 본다.
 
-   ★ 관리자 여부는 여기서 판정하지 않는다.
-     user.roleSeq 가 권한이지만 role 테이블이 없어 값의 의미를 모른다.
-     지금 판단 가능한 것은 「비즈 관리자 페이지에 로그인했다 = 관리자다」뿐이고
-     그것은 08_view_login.sql 의 login_admin 쪽에 있다.
-     role 테이블을 받으면 여기에 is_admin 을 만든다.
+   ★ 관리자와 사용자를 나눈다. role_seq = 0 이 최고관리자다 (2026-09-12 확인).
+     판정은 04_udf.sql 의 is_super_admin() 한 곳에만 둔다.
+
+     08_view_login.sql 의 is_admin_only 와는 다른 것이다. 섞지 않는다.
+       여기(09)   권한상 관리자가 몇 명인가          — 명부 기준
+       저기(08)   관리자 콘솔에 실제로 들어왔는가    — 행동 기준
+     둘이 어긋나면(관리자 권한은 있는데 콘솔에 안 들어온다) 그 자체가 신호다.
    ========================================================================= */
 
 CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_user_company` AS
@@ -29,6 +31,16 @@ WITH u AS (
     COUNTIF(enabled_state = 'X')                      AS user_count_withdrawn,
     COUNTIF(enabled_state = 'B')                      AS user_count_suspended,
     COUNTIF(enabled_state = 'C')                      AS user_count_device_change,
+
+    /* 관리자 / 사용자. role_seq = 0 이 최고관리자다 */
+    COUNTIF(`carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq))
+                                                      AS user_count_admin,
+    COUNTIF(NOT `carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq))
+                                                      AS user_count_member,
+    /* 승인된 사용자 중에서만. 탈퇴·미승인을 빼고 실제 인원을 본다 */
+    COUNTIF(enabled_state = 'Y'
+            AND NOT `carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq))
+                                                      AS user_count_member_active,
 
     /* 확산 속도. 첫 사용자와 마지막 사용자의 간격 */
     MIN(created_at)                                   AS first_user_created_at,
@@ -90,6 +102,9 @@ SELECT
   IFNULL(u.user_count_withdrawn, 0)     AS user_count_withdrawn,
   IFNULL(u.user_count_suspended, 0)     AS user_count_suspended,
   IFNULL(u.user_count_device_change, 0) AS user_count_device_change,
+  IFNULL(u.user_count_admin, 0)         AS user_count_admin,
+  IFNULL(u.user_count_member, 0)        AS user_count_member,
+  IFNULL(u.user_count_member_active, 0) AS user_count_member_active,
   u.first_user_created_at,
   u.last_user_created_at,
   IFNULL(u.user_added_90d, 0)           AS user_added_90d,
@@ -112,6 +127,10 @@ SELECT
   SAFE_DIVIDE(u.user_count_active, NULLIF(c.license_count, 0))
                                         AS license_fill_rate,
 
+  /* 관리자 1명당 사용자 수. 조직 규모의 대리 지표 */
+  SAFE_DIVIDE(u.user_count_member_active, NULLIF(u.user_count_admin, 0))
+                                        AS member_per_admin,
+
   /* 초대는 했는데 안 들어온 비율. 온보딩이 막힌 지점이다 */
   SAFE_DIVIDE(u.user_count_pending, NULLIF(u.user_count_total, 0))
                                         AS pending_rate,
@@ -122,7 +141,11 @@ SELECT
                                         AS is_portal_email_only,
 
   /* 부서를 만들었나. 조직 구조를 넣었다는 것은 도입이 진행됐다는 뜻이다 */
-  (IFNULL(d.department_count, 0) > 0)   AS has_department
+  (IFNULL(d.department_count, 0) > 0)   AS has_department,
+
+  /* 관리자 말고 쓰는 사람이 있나. 없으면 도입이 확산되지 않은 것이다.
+     08번의 is_admin_only(콘솔 로그인 기준)와 다른 각도다 — 이건 명부 기준이다 */
+  (IFNULL(u.user_count_member_active, 0) > 0) AS has_member_user
 
 FROM `carbiz-6f7fc.cartax_statistics.view_company` c
 LEFT JOIN u USING (company_seq)

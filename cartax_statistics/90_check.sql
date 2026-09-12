@@ -164,23 +164,46 @@ WHERE created_at >= '2016-01-01' AND NOT is_success
 GROUP BY error_message ORDER BY row_cnt DESC LIMIT 30;
 
 
-/* ── 13. role_seq 가 무엇인가 ────────────────────────────────────────
-   관리자 여부를 여기서 판정하고 싶은데 role 테이블이 없다.
-   값의 분포와, 비즈 관리자 페이지 로그인 여부의 상관을 본다.
-   특정 role_seq 가 관리자 로그인과 강하게 붙으면 그것이 관리자 권한이다. */
+/* ── 13. 관리자 판정 검증 ────────────────────────────────────────────
+   role_seq = 0 이 최고관리자다 (2026-09-12 확인).
+   실제로 그런지 두 가지로 본다.
+
+   ① role_seq = 0 인 사용자가 비즈 관리자 페이지에 로그인하는가
+      권한이 맞다면 has_admin_login 비율이 0 그룹에서 압도적으로 높아야 한다.
+   ② role_seq = 0 이 아닌데 관리자 콘솔에 들어오는 사용자가 있는가
+      있으면 0 말고 다른 관리자 등급이 있다는 뜻이다. 그때 UDF 를 고친다.
+
+   ※ role_seq 가 NULL 인 사용자도 센다. is_super_admin() 이 NULL 을 FALSE 로
+     떨어뜨리므로 그들은 조용히 「사용자」로 분류된다. 규모를 알아야 한다. */
 SELECT
-  u.role_seq,
-  COUNT(*)                                          AS users,
-  COUNT(DISTINCT u.company_seq)                     AS companies,
-  COUNTIF(u.is_secondary)                           AS secondary_users,
-  COUNTIF(u.is_developer)                           AS developer_users,
-  COUNTIF(a.user_uid IS NOT NULL)                   AS has_admin_login
+  CASE WHEN u.role_seq IS NULL THEN 'NULL'
+       WHEN u.role_seq = 0     THEN '0 (최고관리자)'
+       ELSE CAST(u.role_seq AS STRING) END            AS role_seq,
+  COUNT(*)                                            AS users,
+  COUNT(DISTINCT u.company_seq)                       AS companies,
+  COUNTIF(u.enabled_state = 'Y')                      AS active_users,
+  COUNTIF(a.user_uid IS NOT NULL)                     AS has_admin_login,
+  ROUND(COUNTIF(a.user_uid IS NOT NULL) / COUNT(*) * 100, 1) AS admin_login_pct,
+  COUNTIF(u.is_secondary)                             AS secondary_users,
+  COUNTIF(u.is_developer)                             AS developer_users
 FROM `carbiz-6f7fc.cartax_statistics.raw_user` u
 LEFT JOIN (
   SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
   WHERE created_at >= '2016-01-01' AND is_success AND user_uid IS NOT NULL
 ) a USING (user_uid)
-GROUP BY u.role_seq ORDER BY users DESC LIMIT 30;
+GROUP BY 1 ORDER BY users DESC LIMIT 30;
+
+
+/* ── 13b. 관리자가 0명인 기업 ────────────────────────────────────────
+   모든 기업에 최고관리자가 최소 1명은 있어야 한다. 0 이면 판정이 틀렸거나
+   role_seq 체계가 기업마다 다른 것이다. 숫자가 크면 UDF 를 다시 본다. */
+SELECT
+  COUNTIF(user_count_admin = 0)                       AS companies_without_admin,
+  COUNTIF(user_count_admin = 1)                       AS companies_with_one_admin,
+  COUNTIF(user_count_admin >= 2)                      AS companies_with_many_admins,
+  COUNTIF(NOT has_member_user)                        AS companies_admin_only,
+  COUNT(*)                                            AS companies
+FROM `carbiz-6f7fc.cartax_statistics.view_user_company`;
 
 
 /* ── 14. 사용자 수 — 90일 스냅샷과 어느 정의가 맞는가 ─────────────────

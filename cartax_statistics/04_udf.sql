@@ -24,3 +24,22 @@ AS (
     ELSE NULL          -- 새 등급이 생기면 NULL 로 드러난다. 조용히 뭉개지 않는다
   END
 );
+
+
+/* 최고관리자 여부.
+   role_seq = 0 이 최고관리자다. 나머지는 사용자로 분류한다. (2026-09-12 확인)
+   role 테이블이 없어 0 이외의 값이 서로 어떻게 다른지는 모른다.
+   지금 필요한 구분은 관리자/사용자 둘뿐이라 그것만 만든다.
+
+   ※ IFNULL 로 감싸 NULL 을 FALSE 로 떨어뜨린다.
+     감싸지 않으면 role_seq 가 NULL 인 사용자의 is_super_admin 이 NULL 이 되고,
+     COUNTIF(is_super_admin) 에도 COUNTIF(NOT is_super_admin) 에도 안 잡혀
+     관리자도 사용자도 아닌 채로 집계에서 사라진다.
+     (signup_90days 에서 `FALSE OR NULL` 로 is_test_account 가 통째로 NULL 이
+      됐던 것과 같은 종류의 사고다.)
+     대신 그 NULL 이 조용히 묻히므로 90_check.sql 13번이 개수를 따로 센다. */
+CREATE OR REPLACE FUNCTION `carbiz-6f7fc.cartax_statistics.is_super_admin`(role_seq INT64)
+RETURNS BOOL
+AS (
+  IFNULL(role_seq = 0, FALSE)
+);
