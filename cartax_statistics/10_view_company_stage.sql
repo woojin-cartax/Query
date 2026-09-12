@@ -14,6 +14,12 @@
      관리자 혼자 쓰다 끝나는 기업과 직원까지 퍼진 기업은 갱신 확률이 다를 것이다.
      「어느 단계에서 멈췄나」와 「거기서 얼마나 오래 멈춰 있나」가 개입 시점을 준다.
 
+   ★ 단, 1인 계약은 확산할 대상이 구조적으로 없다. 관리자가 곧 사용자다.
+     이들을 「2단계에서 막힌 기업」으로 세면 전환율의 분모가 오염되고,
+     확산과 갱신의 상관도 희석된다. is_single_seat 으로 갈라 둔다.
+     실제로 어떻게 다룰지(분석에서 제외할지, 별도 세그먼트로 볼지)는 데이터를 보고
+     정한다. 지금 필요한 것은 갈라 볼 수 있게 해 두는 것이다.
+
    ※ 아하 모먼트 후보가 둘이다. 하나를 고르는 게 아니라 둘 다 재고 비교한다.
 
      ① 회사의 첫 N건 운행 — 누가 기록했는지는 상관없다
@@ -145,8 +151,12 @@ base AS (
     t.member_first_trip_date,
 
     /* ── 규모 ── */
+    IFNULL(u.user_count_total, 0)                     AS user_count_total,
     IFNULL(u.user_count_admin, 0)                     AS admin_count,
+    IFNULL(u.user_count_active, 0)                    AS user_active_count,
     IFNULL(u.user_count_member_active, 0)             AS member_active_count,
+    /* 산 자리를 얼마나 채웠나. 1인 계약과 「자리 사놓고 안 채운 기업」을 가른다 */
+    u.license_fill_rate,
     IFNULL(ml.member_logged_in_count, 0)              AS member_logged_in_count,
     IFNULL(t.member_with_trip_count, 0)               AS member_with_trip_count,
     IFNULL(t.admin_trip_count, 0)                     AS admin_trip_count,
@@ -241,9 +251,28 @@ SELECT
   (b.member_first_created_date IS NOT NULL AND b.member_trip_count = 0)
                                                     AS invited_but_no_trip,
 
-  /* 관리자 혼자 쓰고 있다. 2단계로 한 번도 못 갔다 */
+  /* ── 1인 계약 ──────────────────────────────────────────────────────
+     확산할 대상이 없다. 관리자가 곧 사용자다.
+     라이선스를 2장 이상 샀는데 사용자가 1명이면 그건 다른 얘기다 —
+     자리를 사 놓고 안 채운 것이고, 그게 진짜 확산 실패다.
+     그 구분은 license_fill_rate 가 잡는다.
+
+     ※ license_count 가 NULL 인 기업(무료·체험)은 여기서 FALSE 로 떨어진다.
+       그 규모는 90_check.sql 21번이 잰다. 크면 판정을 다시 짠다.               */
+  (b.license_count IS NOT NULL AND b.license_count <= 1)
+                                                    AS is_single_seat,
+
+  /* 관리자 혼자 쓰고 있다. 2단계로 한 번도 못 갔다.
+     1인 계약이면 정상이고, 여러 자리를 산 기업이면 문제다 — 아래에서 가른다 */
   (b.admin_trip_count > 0 AND b.member_first_created_date IS NULL)
                                                     AS admin_only,
+
+  /* 확산이 막힌 기업. 자리를 여러 개 샀는데 관리자 혼자 쓰고 있다.
+     이게 개입 대상이다. admin_only 를 그대로 쓰면 1인 기업이 섞인다 */
+  (b.admin_trip_count > 0
+   AND b.member_first_created_date IS NULL
+   AND NOT (b.license_count IS NOT NULL AND b.license_count <= 1))
+                                                    AS expansion_stalled,
 
   /* 직원 중 실제로 운행한 비율. 확산의 깊이 */
   SAFE_DIVIDE(b.member_with_trip_count, NULLIF(b.member_active_count, 0))

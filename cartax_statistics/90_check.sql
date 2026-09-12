@@ -298,11 +298,14 @@ GROUP BY purpose_code ORDER BY row_cnt DESC LIMIT 40;
    사용자에게 확산하는 것이다. 어디서 막히는지 먼저 본다.
 
    ★ 2단계로 못 넘어간 기업의 비율이 이 파이프라인의 첫 번째 답이다.
-     관리자 혼자 쓰다 끝나는 기업이 많으면 제품 문제가 아니라 온보딩 문제다. */
+     관리자 혼자 쓰다 끝나는 기업이 많으면 제품 문제가 아니라 온보딩 문제다.
+
+   ※ 1인 계약을 반드시 갈라서 본다. 확산할 대상이 없는 기업을 「막힌 기업」으로
+     세면 전환율이 실제보다 나쁘게 나온다. */
 SELECT
+  is_single_seat,
   stage,
   stage_label,
-  stage_group,
   COUNT(*)                                          AS companies,
   COUNTIF(NOT is_withdrawn)                         AS alive,
   COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
@@ -310,8 +313,8 @@ SELECT
   ROUND(AVG(license_count), 1)                      AS avg_license
 FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
 WHERE NOT is_test_account
-GROUP BY stage, stage_label, stage_group
-ORDER BY stage;
+GROUP BY is_single_seat, stage, stage_label
+ORDER BY is_single_seat, stage;
 
 
 /* ── 18. 확산이 갱신과 상관이 있나 ───────────────────────────────────
@@ -319,8 +322,12 @@ ORDER BY stage;
    이게 사실이면 확산 지표가 건강 상태의 1순위가 되고, 아니면 다른 축을 찾아야 한다.
 
    ※ 상관이지 인과가 아니다. 원래 규모가 큰 기업이 확산도 잘 되고 갱신도 잘 하는
-     것일 수 있다. license_count 를 같이 봐서 규모 효과를 가늠한다. */
+     것일 수 있다. license_count 를 같이 봐서 규모 효과를 가늠한다.
+
+   ※ 1인 계약은 확산이 불가능하므로 has_expanded=FALSE 에 무조건 들어간다.
+     갈라 보지 않으면 「확산 안 한 기업도 잘 갱신한다」는 잘못된 결론이 나온다. */
 SELECT
+  is_single_seat,
   has_expanded,
   COUNT(*)                                          AS companies,
   COUNTIF(is_withdrawn)                             AS withdrawn,
@@ -331,7 +338,8 @@ SELECT
   ROUND(AVG(member_activation_rate) * 100, 1)       AS avg_member_activation_pct
 FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
 WHERE NOT is_test_account
-GROUP BY has_expanded;
+GROUP BY is_single_seat, has_expanded
+ORDER BY is_single_seat, has_expanded;
 
 
 /* ── 19. 아하 모먼트 후보 비교 ───────────────────────────────────────
@@ -356,9 +364,10 @@ SELECT
   APPROX_QUANTILES(days_to_member_trip, 4)          AS days_to_member_trip_q,
   APPROX_QUANTILES(days_admin_to_member_trip, 4)    AS days_admin_to_member_q,
   COUNTIF(invited_but_no_trip)                      AS invited_but_no_trip,
-  COUNTIF(admin_only)                               AS admin_only
+  COUNTIF(expansion_stalled)                        AS expansion_stalled
 FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
 WHERE NOT is_test_account
+  AND NOT is_single_seat          -- 확산 후보(②)를 재려면 확산 가능한 기업만 본다
 GROUP BY status;
 
 
@@ -398,3 +407,64 @@ SELECT
 FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
 WHERE NOT is_test_account AND first_payment_date IS NOT NULL
 GROUP BY expanded_before_payment;
+
+
+/* ── 21. 1인 계약의 규모 ─────────────────────────────────────────────
+   우리 고객사에는 혼자 쓰는 기업이 있다. 그 경우 관리자가 곧 사용자이고,
+   확산할 대상이 구조적으로 없다. 이들을 「2단계에서 막힌 기업」으로 세면
+   전환율과 확산-갱신 상관이 둘 다 왜곡된다.
+
+   판정 기준을 데이터로 정하려고 두 축을 교차한다.
+     라이선스 수  계약상 몇 자리를 샀나
+     사용자 수    실제로 몇 명이 있나
+
+   ★ license_count 가 NULL 인 기업(무료·체험으로 보인다)의 규모를 먼저 본다.
+     현재 is_single_seat 은 NULL 을 FALSE 로 떨어뜨린다. 그 수가 크면 판정을 다시 짠다. */
+SELECT
+  CASE
+    WHEN license_count IS NULL THEN 'NULL'
+    WHEN license_count <= 1    THEN '1'
+    WHEN license_count <= 3    THEN '2-3'
+    WHEN license_count <= 10   THEN '4-10'
+    ELSE '11+'
+  END                                               AS license_bucket,
+  CASE
+    WHEN user_count_total = 0 THEN '0'
+    WHEN user_count_total = 1 THEN '1'
+    WHEN user_count_total <= 3 THEN '2-3'
+    ELSE '4+'
+  END                                               AS user_bucket,
+  COUNT(*)                                          AS companies,
+  COUNTIF(is_withdrawn)                             AS withdrawn,
+  COUNTIF(has_expanded)                             AS expanded,
+  COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
+  ROUND(AVG(admin_trip_count), 0)                   AS avg_admin_trips,
+  ROUND(AVG(member_trip_count), 0)                  AS avg_member_trips
+FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+WHERE NOT is_test_account
+GROUP BY license_bucket, user_bucket
+ORDER BY license_bucket, user_bucket;
+
+
+/* ── 21b. 1인 계약이 정말 다른가 ─────────────────────────────────────
+   가른 것이 의미가 있는지 확인한다. 1인 계약의 이탈률이 여러 자리 계약과
+   비슷하다면 굳이 나눌 이유가 없다. 다르다면 별도 세그먼트로 본다.
+
+   ※ 자리를 여러 개 샀는데 관리자 혼자 쓰는 기업(expansion_stalled)이 진짜 개입
+     대상이다. 1인 계약과 섞이면 그 신호가 묻힌다. */
+SELECT
+  CASE
+    WHEN is_single_seat     THEN '1인 계약'
+    WHEN expansion_stalled  THEN '여러 자리인데 관리자 혼자'
+    WHEN has_expanded       THEN '확산됨'
+    ELSE '기타'
+  END                                               AS segment,
+  COUNT(*)                                          AS companies,
+  COUNTIF(is_withdrawn)                             AS withdrawn,
+  ROUND(COUNTIF(is_withdrawn) / COUNT(*) * 100, 1)  AS withdrawn_pct,
+  COUNTIF(is_auto_pay)                              AS auto_pay_on,
+  ROUND(AVG(license_count), 1)                      AS avg_license,
+  ROUND(AVG(license_fill_rate) * 100, 1)            AS avg_fill_pct
+FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+WHERE NOT is_test_account
+GROUP BY segment ORDER BY companies DESC;
