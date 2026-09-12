@@ -291,3 +291,79 @@ SELECT
 FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
 WHERE trip_date >= '2016-01-01'
 GROUP BY purpose_code ORDER BY row_cnt DESC LIMIT 40;
+
+
+/* ── 17. 도입 단계 분포 ──────────────────────────────────────────────
+   우리 제품의 행동은 두 단계다. 1단계는 고객사와 최고관리자, 2단계는 관리자가
+   사용자에게 확산하는 것이다. 어디서 막히는지 먼저 본다.
+
+   ★ 2단계로 못 넘어간 기업의 비율이 이 파이프라인의 첫 번째 답이다.
+     관리자 혼자 쓰다 끝나는 기업이 많으면 제품 문제가 아니라 온보딩 문제다. */
+SELECT
+  stage,
+  stage_label,
+  stage_group,
+  COUNT(*)                                          AS companies,
+  COUNTIF(NOT is_withdrawn)                         AS alive,
+  COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
+  ROUND(AVG(days_since_last_milestone), 0)          AS avg_days_stuck,
+  ROUND(AVG(license_count), 1)                      AS avg_license
+FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+WHERE NOT is_test_account
+GROUP BY stage, stage_label, stage_group
+ORDER BY stage;
+
+
+/* ── 18. 확산이 갱신과 상관이 있나 ───────────────────────────────────
+   가설: 관리자 혼자 쓰는 기업과 직원까지 퍼진 기업은 갱신 확률이 다르다.
+   이게 사실이면 확산 지표가 건강 상태의 1순위가 되고, 아니면 다른 축을 찾아야 한다.
+
+   ※ 상관이지 인과가 아니다. 원래 규모가 큰 기업이 확산도 잘 되고 갱신도 잘 하는
+     것일 수 있다. license_count 를 같이 봐서 규모 효과를 가늠한다. */
+SELECT
+  has_expanded,
+  COUNT(*)                                          AS companies,
+  COUNTIF(is_withdrawn)                             AS withdrawn,
+  ROUND(COUNTIF(is_withdrawn) / COUNT(*) * 100, 1)  AS withdrawn_pct,
+  COUNTIF(is_auto_pay)                              AS auto_pay_on,
+  COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
+  ROUND(AVG(license_count), 1)                      AS avg_license,
+  ROUND(AVG(member_activation_rate) * 100, 1)       AS avg_member_activation_pct
+FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+WHERE NOT is_test_account
+GROUP BY has_expanded;
+
+
+/* ── 19. 아하 모먼트 후보 비교 ───────────────────────────────────────
+   설계안은 「첫 5건 운행」을 후보로 봤다. 그건 사용자 한 명의 행동이다.
+   2단계 구조가 맞다면 진짜 전환점은 「관리자가 아닌 첫 직원이 운행을 기록한 날」
+   일 수 있다. 두 후보의 도달 속도를 유지/이탈로 갈라 비교한다.
+
+   확정이 아니라 탐색이다. 차이가 안 나면 다른 후보를 찾는다. */
+SELECT
+  IF(is_withdrawn, '이탈', '유지')                   AS status,
+  COUNT(*)                                          AS companies,
+  APPROX_QUANTILES(days_to_admin_trip, 4)           AS days_to_admin_trip_q,
+  APPROX_QUANTILES(days_to_member_invite, 4)        AS days_to_member_invite_q,
+  APPROX_QUANTILES(days_to_member_trip, 4)          AS days_to_member_trip_q,
+  APPROX_QUANTILES(days_admin_to_member_trip, 4)    AS days_admin_to_member_q,
+  COUNTIF(invited_but_no_trip)                      AS invited_but_no_trip,
+  COUNTIF(admin_only)                               AS admin_only
+FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+WHERE NOT is_test_account
+GROUP BY status;
+
+
+/* ── 20. 확산이 먼저인가 결제가 먼저인가 ─────────────────────────────
+   확산이 결제를 부르는지, 결제하고 나서 확산하는지. 순서가 개입 시점을 정한다.
+   확산이 먼저라면 무료 구간의 온보딩에 투자해야 하고,
+   결제가 먼저라면 결제 직후가 확산 개입의 골든타임이다. */
+SELECT
+  expanded_before_payment,
+  COUNT(*)                                          AS companies,
+  COUNTIF(is_withdrawn)                             AS withdrawn,
+  ROUND(AVG(days_to_first_payment), 0)              AS avg_days_to_payment,
+  ROUND(AVG(days_to_member_trip), 0)                AS avg_days_to_member_trip
+FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+WHERE NOT is_test_account AND first_payment_date IS NOT NULL
+GROUP BY expanded_before_payment;
