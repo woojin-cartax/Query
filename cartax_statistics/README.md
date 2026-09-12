@@ -24,7 +24,8 @@
 
 | 파일 | 어디서 실행하나 | 무엇을 하나 |
 |---|---|---|
-| `00_mysql_extract.sql` | **서비스 MySQL** (개발팀) | 원천 추출. 우리는 실행하지 않는다 |
+| `00_mysql_extract.sql` | **서비스 MySQL** | 원천 추출 SELECT. 아래 `extract/` 가 읽어서 쓴다 |
+| `extract/extract.py` | MySQL 접근 가능한 곳 | 위 SQL 실행 → parquet → GCS 업로드 |
 | `01_ext_table.sql` | BigQuery | GCS parquet을 가리키는 외부 테이블 |
 | `02_raw_table.sql` | BigQuery | 네이티브 테이블. **선두가 DROP이라 통째 실행 금지** |
 | `03_merge_daily.sql` | BigQuery 예약 쿼리 | 일 증분 MERGE |
@@ -90,7 +91,7 @@ B2C 제품이면 사용자 1명이 단위이고 그 사람의 리텐션을 잰�
 ## 데이터 흐름
 
 ```
-MySQL ──00──▶ parquet ──▶ gs://cartax-biz_cartax_statistics/<테이블>/dt=YYYY-MM-DD/
+MySQL ──extract.py──▶ parquet ──▶ gs://cartax-biz_cartax_statistics/<테이블>/dt=YYYY-MM-DD/
                                           │
                                        01 외부 테이블
                                           │

@@ -12,6 +12,33 @@
 
 ---
 
+## 2026-09-12 — GCS 적재기 추가. 추출 SQL 전수 대조
+
+`00_mysql_extract.sql` 이 참조하는 **컬럼 210개를 실제 스키마와 전수 대조했다.
+불일치 0건.** `deleteDrivingLog.startDate` 처럼 가정으로 넣었던 것도 실재를 확인했다.
+
+다만 **SQL 을 그대로 클라이언트에 붙이면 돌지 않는다.** 세 군데가 걸린다.
+
+1. `:from` / `:to` 는 MySQL 문법이 아니다
+2. `(enabled = 'X')` 가 0/1 정수로 나온다. parquet 에 int64 로 들어가면
+   BOOL 로 선언한 BigQuery 테이블에 적재가 깨진다
+3. `drivingLog` 2,500만 행 단일 SELECT 는 메모리가 터진다
+
+`extract/extract.py` 가 셋을 처리한다. **SQL 을 복제하지 않는다** —
+`00_mysql_extract.sql` 에서 SELECT 문을, `02_raw_table.sql` 에서 타입을 읽어서 쓴다.
+복제하면 한쪽만 고쳤을 때 조용히 어긋난다.
+
+끊어 읽기는 기본키 키셋 방식이다. `OFFSET` 은 뒤로 갈수록 느려져 쓰지 않는다 —
+`seq > 마지막값 ORDER BY seq LIMIT n` 으로 앞으로만 나아간다. 커서 컬럼은 parquet
+에 넣지 않고 읽은 뒤 떼어낸다.
+
+`--dry-run` 으로 접속 없이 만들어질 SQL 을 볼 수 있다. 13개 테이블 전부 확인했다.
+접속 정보는 환경변수로만 받는다.
+
+작성 중 결함 셋. `parse_selects` 가 `FROM` 절을 버렸고(정규식 split 이 먹었다),
+`SELECT` 키워드도 같은 이유로 빠졌고, `'%,d'` 는 Python 형식이 아니라 실행 시
+터진다. dry-run 출력을 직접 읽어서 잡았다.
+
 ## 2026-09-12 — 미확정 항목 정리. 5개 중 3개 닫음
 
 - **`role` · `duty` 테이블은 받을 필요가 없다.** `role_seq = 0` 이 최고관리자이고
