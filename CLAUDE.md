@@ -70,7 +70,8 @@ dry-run 통과를 "검증 완료"라고 말하지 않는다. 통과했다는 사
 - 정책에 영향 주는 변경이면 `_DataAnalytics/HISTORY.md`에도 한 줄 + 이 커밋 해시
 - **커밋 후 `origin` 푸시까지 진행한다. 매번 승인받지 않는다.**
   원격은 `woojin-cartax/Query`(비공개), SSH 별칭 `github-woojinjeon-cartax`.
-  `--force` · 브랜치 삭제 · 히스토리 재작성 · 공개 전환은 먼저 묻는다.
+  먼저 묻는 예외(`--force`·브랜치 삭제·히스토리 재작성·공개 전환)와 근거는
+  `../policy/20_git.md` 의 「푸시」 절에 있다.
 
 ## 상위 정책 문서를 고칠 때
 
