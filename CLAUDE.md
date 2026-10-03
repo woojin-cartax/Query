@@ -68,3 +68,26 @@ dry-run 통과를 "검증 완료"라고 말하지 않는다. 통과했다는 사
 
 - `HISTORY.md` 맨 위에 항목 추가
 - 정책에 영향 주는 변경이면 `_DataAnalytics/HISTORY.md`에도 한 줄 + 이 커밋 해시
+- **커밋 후 `origin` 푸시까지 진행한다. 매번 승인받지 않는다.**
+  원격은 `woojin-cartax/Query`(비공개), SSH 별칭 `github-woojinjeon-cartax`.
+  `--force` · 브랜치 삭제 · 히스토리 재작성 · 공개 전환은 먼저 묻는다.
+
+## 상위 정책 문서를 고칠 때
+
+`../policy/` 와 `../decisions/` 는 **다른 저장소(`_DataAnalytics`)의 파일**이다.
+같은 세션에서 고쳐도 되지만 **커밋이 가는 곳이 다르다.**
+
+```bash
+git rev-parse --show-toplevel   # 지금 어느 저장소인지 먼저 확인
+```
+
+| 고친 파일 | 커밋할 저장소 |
+|---|---|
+| `query/` 안의 SQL·README·HISTORY | `query` |
+| `../policy/*` · `../decisions/*` · `../REGISTRY.md` | `_DataAnalytics` |
+
+섞어서 커밋하지 않는다. PM 저장소 `.gitignore` 가 화이트리스트라 `query/` 는
+애초에 추적되지 않는다. `git add -f` 로 우회하지 않는다.
+
+정책을 고치는 계기는 대개 여기서 겪은 일이다. 근거가 끊기지 않게,
+하류 커밋 해시를 PM `HISTORY.md` 항목에 함께 남긴다.
