@@ -148,6 +148,16 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 ### signup_2025/ — **미사용**
 
 데이터셋이 2026-02 이후 갱신이 멈췄고 현재 쓰이지 않는다. 참고용 보관이며 실행하지 않는다.
+
+일별 적재가 아니라 **연 단위 1회성 적재**였다. 원본은 아래 두 폴더이고 둘 다 파일 1개뿐이다.
+
+```
+gs://cartax-biz_signup_year/signup_2025/signup_2025                              760 KB · 2026-02-05
+gs://cartax-biz_signup_year/signup_2025_detail/signup_detail_2025_master_db.parquet  384 KB · 2026-02-26
+```
+
+BigQuery `raw_signup_2025` 는 3,455행, 마지막 수정 2026-02-12.
+**되살리려면 이 경로가 필요하다** — `81_year_detail_merge.sql` 이 참조한다.
 `04_view_derived.sql`과 파생 구성이 어긋나 있으나 미사용이므로 맞추지 않는다.
 다시 쓰게 되면 그때 04 기준으로 재작성한다.
 
