@@ -13,7 +13,10 @@
      증거가 되지 않는다. 행이 0이면 EMPTY 로 남긴다.
    ========================================================================= */
 
-DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 1 DAY);
+/* INTERVAL 0 — 당일 파일을 당일 머지한다. signup_90days 와 같은 규약이다.
+   1 DAY 로 두면 예약 실행이 영구히 하루씩 뒤처진다. 멱등해서 에러는 안 나고
+   이미 적재된 날짜를 매일 다시 머지하며 당일 건이 안 들어온다. 조용히 틀린다. */
+DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 0 DAY);
 --DECLARE start_dt  DATE DEFAULT DATE('2026-09-15');   -- 소급 적재용 (주석 해제)
 
 DECLARE before_cnt, after_cnt, merged_cnt INT64;

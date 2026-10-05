@@ -5,6 +5,49 @@
 형식:
 
 ```
+
+## 2026-10-06 — signup_statistics 배포. 전 고객사 집계 스냅샷 적재 개시
+
+`gs://cartax-biz-statistics/` 로 2026-09-15 부터 하루도 빠지지 않고 들어오던 전 고객사
+집계 스냅샷이 21일째 쓰이지 않고 있었다. 적재 경로를 만들고 배포했다.
+
+폴더를 `signup_statistics/` 로 새로 뒀다. 브랜치로 나누지 않은 이유는 그 README 에 있다 —
+`cartax_statistics/`(원천 13테이블)와 서로 배타적인 배포이고 합쳐지지 않는다.
+뷰 7개가 전부 raw 13테이블에 기대므로 집계 스냅샷으로 가면 재사용되는 것이
+`04_udf.sql` 하나다. 데이터셋이 다르므로 둘을 동시에 적재해 같은 날짜로 대조할 수 있고,
+그게 설계안 11번 전환 순서 7번이다.
+
+**배포 결과**
+
+    데이터셋      signup_statistics (asia-northeast3, 90일과 동일)
+    소급 적재      2026-09-15 ~ 10-05, 21일치 431,416행, SUCCESS
+    예약 쿼리      signup_statistics_daily · every day 14:30 UTC = 23:30 KST
+    본문          03_merge_daily.sql 과 바이트 동일 (sha 대조)
+
+`corporate_number` 가 **73.0% 확보**됐다(20,589개사 중 15,040). 지금 중복 판정은
+`company_name_norm` 으로 추측하는데, 그중 73%를 사업자번호로 확정할 수 있다.
+확보율이 날짜마다 거의 같은 것은 특정 시점 이후 가입 건에만 받았기 때문이다.
+
+**작성 중 잡은 결함 둘**
+
+`target_dt` 를 `INTERVAL 1 DAY` 로 썼다. 90일 쪽은 `INTERVAL 0` 이다. 1 DAY 로 두면
+예약 실행이 **영구히 하루씩 뒤처진다** — 멱등해서 에러는 안 나고, 이미 적재된 날짜를
+매일 다시 머지하며 당일 건이 안 들어온다. 조용히 틀리는 종류다.
+
+`--target_dataset` 을 줘서 예약 쿼리가 생성 직후 실패했다.
+`Dataset specified in the query ('') is not consistent with Destination dataset` —
+`DECLARE`·`MERGE` 스크립트 쿼리는 대상 데이터셋이 비어 있어야 한다.
+`bq update --transfer_config --target_dataset=''` 는 **"successfully updated" 라고 하고도
+값을 지우지 않는다.** REST PATCH 로 비웠다. 둘 다 README 에 적었다.
+
+**확인한 것**
+
+컬럼 정합성을 정적 대조했다 — DDL 38 = MERGE 별칭 38(loaded_at 포함), 순서까지 일치,
+parquet 37컬럼 전부 사용, 없는 컬럼 참조 0건. `INSERT ROW` 가 순서를 요구한다.
+
+새벽에 수동 실행하면 `CURRENT_DATE("Asia/Seoul")` 가 당일이라 파일이 아직 없고
+`EMPTY` 가 남는다. 실패가 아니다. 그것도 README 에 적었다.
+
 ## YYYY-MM-DD — 한 줄 요약
 
 무엇이 왜 바뀌었는지. 영향받는 하위 산출물/대시보드가 있으면 명시.

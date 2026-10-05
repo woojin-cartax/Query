@@ -57,6 +57,67 @@ MERGE 키가 `(snapshot_date, company_code)` 이고 **그것만으로 멱등하�
 
 소급 적재는 `03_merge_daily.sql` 안의 주석 템플릿으로 한다. 파일을 복제하지 않는다.
 
+## 일정
+
+| | |
+|---|---|
+| 원본 업로드 | **22:48 KST** (90일 피드는 22:00) |
+| 예약 쿼리 | **23:30 KST** = `every day 14:30` (UTC) |
+| `target_dt` | `INTERVAL 0 DAY` — **당일 파일을 당일 머지한다** |
+
+`INTERVAL 1 DAY` 로 두면 예약 실행이 영구히 하루씩 뒤처진다. 멱등해서 에러는 안 나고
+이미 적재된 날짜를 매일 다시 머지하며 당일 건이 안 들어온다. `signup_90days` 와 같은
+규약(`INTERVAL 0`)을 쓴다.
+
+업로드(22:48)와 머지(23:30) 사이 42분 여유다. 90일 피드는 60분(22:00 → 23:00)이다.
+업로드가 늦어지면 그날은 `EMPTY` 로 남고 다음 날 같은 날짜를 다시 머지하면 복구된다 —
+키가 `(snapshot_date, company_code)` 라 멱등하다.
+
+## 예약 쿼리 — 터미널로 만들었다
+
+```
+projects/975350524805/locations/asia-northeast3/transferConfigs/
+  6ac3ec57-0000-2b3a-9570-3c286d353572        signup_statistics_daily
+```
+
+본문은 `03_merge_daily.sql` 과 **바이트 동일**하다(sha 앞 12자 대조). 갱신은 이렇게 한다 —
+SQL 에 백틱이 있어 셸을 거치면 깨지므로 Python 으로 직접 넘긴다.
+
+```python
+import json, subprocess, io
+CFG = "projects/975350524805/locations/asia-northeast3/transferConfigs/6ac3ec57-0000-2b3a-9570-3c286d353572"
+sql = io.open("03_merge_daily.sql", encoding="utf-8").read()
+subprocess.run(["bq","update","--transfer_config",
+                f"--params={json.dumps({'query': sql})}", CFG], check=True)
+```
+
+### ★ 스크립트 쿼리에는 destinationDatasetId 가 비어 있어야 한다
+
+`DECLARE`·`MERGE` 를 쓰는 예약 쿼리에 대상 데이터셋을 지정하면 **매 실행이 실패한다.**
+
+```
+Dataset specified in the query ('') is not consistent with Destination dataset 'signup_statistics'.
+```
+
+`signup_90days` 의 `update_daily` 도 `destinationDatasetId: ''` 다. 생성할 때
+`--target_dataset` 을 **주지 않는다.**
+
+이미 지정해 버렸으면 `bq update --transfer_config --target_dataset=''` 로는 안 지워진다 —
+**"successfully updated" 라고 하고도 값이 남는다.** REST 로 비운다.
+
+```bash
+TOKEN=$(gcloud auth print-access-token)
+curl -s -X PATCH "https://bigquerydatatransfer.googleapis.com/v1/${CFG}?updateMask=destinationDatasetId" \
+  -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
+  -d '{"destinationDatasetId": ""}'
+```
+
+### 수동 실행은 KST 밤에만 의미가 있다
+
+`bq mk --transfer_run` 으로 즉시 돌리면 `CURRENT_DATE("Asia/Seoul")` 가 그 시점 기준이다.
+새벽에 돌리면 **그날 파일이 아직 없어 `EMPTY` 가 정상이다.** 실패가 아니다.
+소급이 필요하면 `03_merge_daily.sql` 의 소급 템플릿을 로컬에서 돌린다.
+
 ## 주의
 
 - **`02_raw_table.sql` 을 통째로 실행하지 않는다.** 선두 `DROP TABLE` 이 누적 스냅샷을
