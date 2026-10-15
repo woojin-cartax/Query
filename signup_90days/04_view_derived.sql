@@ -181,7 +181,7 @@ WITH base AS (
         ' ',
         LOWER(IFNULL(r.company_code, ''))
       ),
-      r'(영티포|카택스|테스트|4424|유진의|조훈|낙현회사|퍼피또리)'
+      r'(영티포|카택스|테스트|4424|유진의|조훈|낙현회사|낙형회사|퍼피또리)'
     )
     /* 수동으로 테스트 지정한 계정을 보탠다. 정규식이 놓친 것을 사람이 채운다.
        COALESCE가 필요하다. mo.override가 NULL이면 `FALSE OR NULL`이 FALSE가 아니라

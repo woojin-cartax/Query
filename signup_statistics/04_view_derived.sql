@@ -68,8 +68,16 @@ SELECT
       REGEXP_REPLACE(LOWER(NORMALIZE(IFNULL(r.company_name, ''), NFKC)), r'\s+', ''),
       ' ', LOWER(IFNULL(r.company_code, ''))
     ),
-    r'(영티포|카택스|테스트|4424|유진의|조훈|낙현회사|퍼피또리)'
-  )                                               AS is_test_account,
+    r'(영티포|카택스|테스트|4424|유진의|조훈|낙현회사|낙형회사|퍼피또리)'
+  )
+  /* 테스트 계정이 쓰는 가짜 사업자번호. 이 피드에만 있는 보조 판정이다.
+     2026-10-15 기준 이 번호를 쓰는 13곳이 전부 테스트였다. 그중 `낙형회사` 는
+     `낙현회사` 의 한 글자 변형이라 키워드를 빠져나가 있었다.
+     signup_90days 에는 사업자번호가 없어 이 줄만큼 판정이 갈린다 — 키워드에도
+     `낙형회사` 를 넣어 지금은 차이가 0곳이다.
+     IFNULL 로 감싼 값끼리 비교하므로 NULL 이 나오지 않는다. (FALSE OR NULL = NULL) */
+  OR REGEXP_REPLACE(IFNULL(r.corporate_number, ''), r'[^0-9]', '') = '1231231231'
+                                                  AS is_test_account,
 
   /* ── 가입 시점 파생 ───────────────────────────────────────────────── */
   DATE(r.signup_date)                                        AS signup_date_d,
