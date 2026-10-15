@@ -49,8 +49,12 @@ gs://cartax-biz-statistics/dt=YYYY-MM-DD/YYYYMMDD.parquet
 | `license_type` | 90일에서 `license_count` 로 바로잡은 그 오기. 여기서도 교정한다 |
 | `updated_at` 없음 | 증분 기준이 없다. **날짜별 전량**이다 |
 
-`signup_device` 에 `iOS : 앱 다운로드 > 관리자 계정 가입` 처럼 **유입 경로 문장**이
-들어온다(일부는 비어 있다). 90일 피드의 `pc/mobile/ios/and` 보다 풍부하다.
+`signup_device` 에는 이름과 달리 디바이스가 아니라 **가입 경로 문장**(원천 `joinPath`)이
+들어온다 — `iOS : 앱 다운로드 > 관리자 계정 가입`, `네이버_cpc` 같은 것. **90일 피드도 똑같다.**
+PC/모바일 구분(원천 `joinType`: pc · mobile · ios · and)은 **두 피드 어디에도 없다** —
+90일 raw 전 기간(2026-01-26 ~)에 그런 값이 0건이다. 앱 가입만 `AOS :` · `iOS :` 로 드러난다.
+웹 가입의 경로 문장은 2026-04 부터 끊겼다. (이 자리에 「90일 피드의 `pc/mobile/ios/and` 보다
+풍부하다」고 적었었다. 원천 `joinType` 주석을 피드 값으로 착각한 것이고 틀렸다.)
 
 ## 파일
 
