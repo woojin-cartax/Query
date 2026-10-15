@@ -7,19 +7,27 @@ BigQuery 쿼리 관리. 데이터셋 단위 SQL 폴더.
 | 폴더 | 데이터셋 | 상태 | 자동 실행 |
 |---|---|---|---|
 | `signup_90days/` | `signup_90days` | **운영 중** | 예약쿼리 `update_daily` 매일 23:00 KST |
-| `cartax_statistics/` | — | **배포 전 초안.** 데이터셋·테이블 없음 | 없음 |
+| `signup_statistics/` | `signup_statistics` | **운영 중** (2026-10-06~) | 예약쿼리 `signup_statistics_daily` 매일 23:30 KST |
+| `cartax_source/` | — | **배포 전 초안. 내부 컨펌 대기.** 데이터셋·테이블 없음 | 없음 |
 | `signup_2025/` | `signup_2025` | 미사용. 2026-02 이후 갱신 멈춤 | 없음 |
 | `search_console/` | `searchconsole` | 미배포 초안 | 없음 |
 
-**운영 중인 것은 `signup_90days` 하나다.** 매일 22:00(KST)에 원본이 GCS로 올라오고
-23:00에 예약쿼리가 MERGE 한다. 끄면 대체할 것이 없다 — `cartax_statistics` 는
-코드만 있고 행이 0개다.
+**운영 중인 것은 둘이다.** 둘 다 고객사 1곳 = 하루 1행인 **집계 스냅샷**이고
+모집단만 다르다.
 
-`cartax_statistics` 는 수집 범위를 전 고객사로 넓히는 차세대 파이프라인이다.
-13개 원천 테이블 + 뷰 6개 + 일별 스냅샷을 설계·작성했고 **아직 아무것도 배포하지
-않았다.** 별도로, `gs://cartax-biz-statistics/` 로 **전 고객사 집계 스냅샷이 이미
-들어오고 있다**(2026-09-15~, 하루 1파일) — 설계한 구조와 다른 모양이라 어느 쪽으로
-갈지 정해야 한다. 자세한 것은 `cartax_statistics/README.md`.
+| | 원본 업로드 | MERGE | 모집단 |
+|---|---|---|---|
+| `signup_90days` | 22:00 KST | 23:00 | 최근 90일 가입 |
+| `signup_statistics` | 22:48 KST | 23:30 | **전 고객사** (2만여 곳). 사업자등록번호 포함 |
+
+`signup_statistics` 는 2026-10-06 첫 자동 실행 이후 10-14 까지 9회 전부 SUCCEEDED,
+raw 행 수 431,416 → 616,973(하루 약 2.06만)으로 실제 적재를 확인했다.
+`signup_90days` 를 끄면 대체할 것이 없다 — 월별 요약·KPI 뷰가 거기 기대고 있다.
+
+`cartax_source` 는 집계가 아니라 **서비스 MySQL 원천 13테이블**을 받는 설계다
+(운행 1건 = 1행). 기준이 바뀌어도 과거까지 재계산할 수 있다는 것이 집계 대비 장점이고,
+개발팀이 추출을 만들어야 시작된다는 것이 단점이다. **내부 컨펌 전이라 대기 중이다.**
+자세한 것은 `cartax_source/README.md`.
 
 ## 인계 — 열린 항목
 
@@ -27,16 +35,17 @@ BigQuery 쿼리 관리. 데이터셋 단위 SQL 폴더.
 
 | # | 무엇 | 왜 막혀 있나 |
 |---|---|---|
-| 1 | **`gs://cartax-biz-statistics/` 를 받아들일지** | 전 고객사 집계 스냅샷이 2026-09-15부터 하루 1파일씩 **이미 들어오고 있다**(37컬럼, 2만 행). 그런데 `cartax_statistics/` 가 설계한 것은 원천 13테이블이다. 모양이 다르다. 둘 중 하나로 가야 한다 |
+| 1 | **`cartax_source`(원천 13테이블)를 진행할지** | 집계 스냅샷은 `signup_statistics` 로 받아들여 2026-10-06 부터 운영 중이다. 남은 질문은 원천도 받을지다 — 집계는 질문이 고정돼 과거 재계산이 안 된다. **내부 컨펌 대기.** 진행하면 두 데이터셋을 동시에 적재해 같은 날짜로 2주 이상 대조한다(설계안 전환 순서 7번) |
 | 2 | **`00_mysql_extract.sql` 전달 여부** | 1번과 묶인다. 원천 13테이블로 간다면 개발팀에 넘겨야 한다. 코드·적재기(`extract/`)는 완성됐다 |
 | 3 | **해지·탈퇴 사유의 소재** | 원천 605컬럼 전수 검색에 없다. 설계안 선별 기준 3(사람이 남긴 것은 반드시 받는다)이 이것 때문에 안 지켜지고 있다. 별도 테이블인지, 저장을 안 하는지 개발팀 확인 |
 | 4 | **`payment.memo` 값** | 해지 사유 후보. 주석이 없어 무엇을 담는지 모른다 |
 | 5 | **백필 범위 10년 vs 3년** | 과거 밀도가 현재의 1/7. 3년부터 받고 필요하면 더 받는 쪽을 설계안이 권한다 |
 | 6 | **`영농조합법인` 정규식 누락** | `company_name_norm` 법인격 목록에 `영어조합법인`은 있고 `영농조합법인`이 없다. 둘 다 실재하는 법인격이고 영농이 더 흔하다. 고치면 **운영 중인 뷰 재배포 + 중복 판정 결과 변동 가능**이라 영향 규모를 먼저 세야 한다. 영업관리 시트와도 맞춰야 한다 |
+| 7 | **`signup_statistics` → `signup_company_daily` 개명** | 「signup」인데 운행·결제·로그인 집계까지 들어 있어 내용과 안 맞는다. 후보명은 정했고 **1번과 함께 대기.** 배포돼 있어 공짜가 아니다 — 데이터셋은 이름을 못 바꾸므로 새 데이터셋 생성 → 테이블 복사 → 뷰 재생성 → 예약 쿼리 재등록 → 구 데이터셋 삭제다. 폴더명은 데이터셋명과 같아야 하므로(`policy/10_naming.md`) 폴더만 먼저 바꾸지 않는다 |
 
 ### 데이터가 들어오면 저절로 풀리는 것
 
-`cartax_statistics/README.md` 의 「확정되지 않은 것」에 모아 뒀다 — `purpose` 조인 키,
+`cartax_source/README.md` 의 「확정되지 않은 것」에 모아 뒀다 — `purpose` 조인 키,
 「운행 1건」 판정 3가지, `user_count` 정의 대응, uid 커버리지, 로그인 이력 규모,
 `createTime` 신뢰 구간, 아하 모먼트 `N`, 확산과 갱신의 상관, 1인 계약 처리.
 **지금 회의로 풀리는 것이 아니라 적재 후 `90_check.sql` 로 답이 나온다.**
@@ -47,7 +56,7 @@ BigQuery 쿼리 관리. 데이터셋 단위 SQL 폴더.
 (2026-08-14 ~ 09-11). 관리자 화면 export, 전 고객사 18,949행, 가입일 2016년부터.
 `raw_trip` 최초 적재 직후 이것과 대조하면 **「운행 1건」의 정의가 맞는지 확인된다.**
 개인정보 컬럼(담당자·연락처·이메일)은 읽지 않는다. 이 저장소에 복사하지 않는다.
-상세는 `cartax_statistics/README.md`.
+상세는 `cartax_source/README.md`.
 
 ### 준비됐으나 실행하지 않은 것
 
@@ -119,12 +128,12 @@ GCS  gs://cartax-biz_signup_90days/dt=*            일별 parquet 스냅샷
 | `93_table_list.sql` | `93_table_list` | 데이터셋의 테이블·뷰 목록 | 수동 |
 | `94_weekly_signup.sql` | 없음 | 신규 가입 기업 주별 추이 (목~수). CX 주간 리포트용 | 수동 |
 
-### cartax_statistics/ — **배포 전 초안**
+### cartax_source/ — **배포 전 초안**
 
 전 고객사 원천 수집. 서비스 MySQL 24개 시트 605컬럼에서 13개 테이블 182컬럼을 받는다.
-근거와 컬럼별 결정은 `cartax_statistics/README.md` 와 아래 두 문서에 있다.
+근거와 컬럼별 결정은 `cartax_source/README.md` 와 아래 두 문서에 있다.
 
-- [cartax_statistics 수집 명세](https://claude.ai/code/artifact/c3330e75-097c-441d-b3ec-1ebbcabe725b) — 무엇을 왜 받고 왜 빼는가
+- [cartax_statistics 수집 명세](https://claude.ai/code/artifact/c3330e75-097c-441d-b3ec-1ebbcabe725b) — 무엇을 왜 받고 왜 빼는가. 본문의 `cartax_statistics` = 지금의 `cartax_source`
 - [일별 스냅샷 설계안 3판](https://claude.ai/code/artifact/b9efa310-2aa5-4c4d-b828-b85c7f923f5b) — 왜 이렇게 정했는가
 
 | 파일 | 역할 |
@@ -190,7 +199,7 @@ BigQuery `raw_signup_2025` 는 3,455행, 마지막 수정 2026-02-12.
 ## 프로젝트의 다른 데이터셋
 
 이 작업장은 `signup_90days` / `signup_2025` / `searchconsole` 를 다루고,
-`cartax_statistics` 는 아직 데이터셋이 없다.
+`cartax_source` 는 아직 데이터셋이 없다.
 프로젝트에는 아래도 있으나 현재 범위 밖이다.
 
 `analytics_429050434`, `analytics_528628070`, `analytics_528629362`, `ga4_mkt_analytics`

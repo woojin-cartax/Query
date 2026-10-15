@@ -14,7 +14,7 @@
    company.level / payment.level / paySchedule.level / freeExperienceHistory.level
    이 모두 같은 체계를 쓴다.
    기존 signup_90days 의 pricing_plan (FREE/PLUS/PREMIUM) 과 대응한다. */
-CREATE OR REPLACE FUNCTION `carbiz-6f7fc.cartax_statistics.plan_name`(plan_level INT64)
+CREATE OR REPLACE FUNCTION `carbiz-6f7fc.cartax_source.plan_name`(plan_level INT64)
 RETURNS STRING
 AS (
   CASE plan_level
@@ -37,7 +37,7 @@ AS (
      (signup_90days 에서 `FALSE OR NULL` 로 is_test_account 가 통째로 NULL 이
       됐던 것과 같은 종류의 사고다.)
      대신 그 NULL 이 조용히 묻히므로 90_check.sql 13번이 개수를 따로 센다. */
-CREATE OR REPLACE FUNCTION `carbiz-6f7fc.cartax_statistics.is_super_admin`(role_seq INT64)
+CREATE OR REPLACE FUNCTION `carbiz-6f7fc.cartax_source.is_super_admin`(role_seq INT64)
 RETURNS BOOL
 AS (
   IFNULL(role_seq = 0, FALSE)

@@ -4,7 +4,7 @@
 만들어 GCS 에 올린다. SQL 을 복제하지 않는다 — 복제본은 동기화되지 않는다.
 
 ```
-00_mysql_extract.sql  ──▶  extract.py  ──▶  gs://cartax-biz_cartax_statistics/<테이블>/dt=YYYY-MM-DD/
+00_mysql_extract.sql  ──▶  extract.py  ──▶  gs://cartax-biz_cartax_source/<테이블>/dt=YYYY-MM-DD/
 02_raw_table.sql      ──▶      (타입)
 ```
 
@@ -29,7 +29,7 @@ pip install pymysql pyarrow google-cloud-storage
 
 ```bash
 export MYSQL_HOST=... MYSQL_PORT=3306 MYSQL_USER=... MYSQL_PASSWORD=... MYSQL_DB=...
-export GCS_BUCKET=cartax-biz_cartax_statistics      # 기본값이라 생략 가능
+export GCS_BUCKET=cartax-biz_cartax_source      # 기본값이라 생략 가능
 gcloud auth application-default login               # GCS 쓰기 권한
 ```
 

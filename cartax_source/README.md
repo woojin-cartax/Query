@@ -1,4 +1,4 @@
-# cartax_statistics — 서비스 MySQL 원천 사본
+# cartax_source — 서비스 MySQL 원천 사본
 
 전체 고객사 데이터를 원천에 가까운 형태로 받아 BigQuery에 쌓는다.
 집계는 받지 않고 우리가 만든다. 기준이 바뀌어도 데이터를 다시 받지 않기 위해서다.
@@ -10,7 +10,7 @@
 
 | 문서 | 무엇 | 상태 |
 |---|---|---|
-| [cartax_statistics 수집 명세](https://claude.ai/code/artifact/c3330e75-097c-441d-b3ec-1ebbcabe725b) | **이 폴더의 운영 기준.** 컬럼 단위로 무엇을 왜 받고 왜 빼는가 | 최신 |
+| [cartax_statistics 수집 명세](https://claude.ai/code/artifact/c3330e75-097c-441d-b3ec-1ebbcabe725b) | **이 폴더의 운영 기준.** 컬럼 단위로 무엇을 왜 받고 왜 빼는가. 이름 변경 전에 썼다 — 본문의 `cartax_statistics` 는 지금의 `cartax_source` 다 | 최신 |
 | [일별 스냅샷 설계안 3판](https://claude.ai/code/artifact/b9efa310-2aa5-4c4d-b828-b85c7f923f5b) | **왜** 이렇게 받기로 했는가. 판단 근거 | 최신 |
 | 가입 데이터 수집 명세 | 현재 운영 중인 90일 스냅샷의 실측 (36컬럼) | 그대로 둔다. 전체 수집 이전의 유일한 기록 |
 
@@ -40,15 +40,18 @@ gs://cartax-biz-statistics/dt=YYYY-MM-DD/YYYYMMDD.parquet
 `signup_device` 에 `iOS : 앱 다운로드 > 관리자 계정 가입` 처럼 **유입 경로 문장**이
 들어온다(일부는 비어 있다). 90일 피드의 `pc/mobile/ios/and` 보다 풍부하다.
 
-**어느 쪽으로 갈지 정해야 한다.** 이 폴더의 13테이블 설계를 계속 갈지,
-이 집계 스냅샷을 받아들이고 설계를 줄일지. 전자라면 `00_mysql_extract.sql` 을
+이 집계 스냅샷은 `../signup_statistics/` 로 받아들여 2026-10-06 부터 운영 중이다.
+**남은 질문은 이 폴더의 원천 13테이블도 받을지**다. 진행한다면 `00_mysql_extract.sql` 을
 개발팀에 넘기는 것이 다음 행동이다.
 
 ## 상태
 
-**아직 아무것도 배포되지 않았다.** MySQL 추출이 시작되기 전의 초안이다.
-데이터셋 `cartax_statistics`, 버킷 `gs://cartax-biz_cartax_statistics/` 도 아직 만들지 않았다.
-이름은 확정 전이라 바꿀 수 있다.
+**아직 아무것도 배포되지 않았다. 내부 컨펌 대기.** MySQL 추출이 시작되기 전의 초안이다.
+데이터셋 `cartax_source`, 버킷 `gs://cartax-biz_cartax_source/` 도 아직 만들지 않았다.
+
+이름은 `source_db` → `cartax_statistics` → **`cartax_source`**(2026-10-15)로 바뀌었다.
+집계(statistics)가 아니라 원천(source)을 받는 폴더라서다. 이름 변경 전에 쓴 문서
+(수집 명세, 설계안 3판)의 `cartax_statistics` 는 이 폴더다.
 
 ## 파일
 
@@ -149,7 +152,7 @@ B2C 제품이면 사용자 1명이 단위이고 그 사람의 리텐션을 잰�
 ## 데이터 흐름
 
 ```
-MySQL ──extract.py──▶ parquet ──▶ gs://cartax-biz_cartax_statistics/<테이블>/dt=YYYY-MM-DD/
+MySQL ──extract.py──▶ parquet ──▶ gs://cartax-biz_cartax_source/<테이블>/dt=YYYY-MM-DD/
                                           │
                                        01 외부 테이블
                                           │

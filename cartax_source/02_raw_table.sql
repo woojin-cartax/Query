@@ -25,8 +25,8 @@
 
 
 /* ── trip — 운행 원본. 10년 2,500만 행 ─────────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_trip`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trip`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_trip`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_trip`
 (
   trip_id                  INT64    NOT NULL,
   company_seq              INT64,
@@ -69,8 +69,8 @@ OPTIONS (
 
 
 /* ── payment — 결제 이력 ──────────────────────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_payment`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_payment`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_payment`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_payment`
 (
   payment_id               INT64    NOT NULL,
   company_seq              INT64,
@@ -101,8 +101,8 @@ OPTIONS (description = '결제 이력. MySQL payment. 1행 = 결제 1건. contra
 
 
 /* ── pay_schedule — 정기결제 예약과 결과. 실패 기록이 여기 있다 ────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_pay_schedule`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_pay_schedule`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_pay_schedule`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_pay_schedule`
 (
   schedule_id              INT64    NOT NULL,
   company_seq              INT64,
@@ -123,8 +123,8 @@ OPTIONS (description = '정기결제 예약·결과. MySQL paySchedule. status=E
 
 
 /* ── company_pay_state — 기업의 현재 결제 상태 (기업당 1행) ───────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_company_pay_state`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company_pay_state`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_company_pay_state`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_company_pay_state`
 (
   pay_state_id             INT64    NOT NULL,
   company_seq              INT64,
@@ -150,8 +150,8 @@ OPTIONS (description = '기업 현재 결제 상태. MySQL companyPayState. 결�
 
 
 /* ── company_pay_state_history — 결제 상태 변경 이력 ──────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_company_pay_state_history`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company_pay_state_history`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_company_pay_state_history`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_company_pay_state_history`
 (
   history_id               INT64    NOT NULL,
   pay_state_id             INT64,
@@ -178,8 +178,8 @@ OPTIONS (description = '결제 상태 변경 이력. MySQL companyPayStateHistor
 
 
 /* ── trial_history — 무료체험 부여 이력 ──────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_trial_history`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trial_history`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_trial_history`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_trial_history`
 (
   trial_id                 INT64    NOT NULL,
   company_seq              INT64,
@@ -196,8 +196,8 @@ OPTIONS (description = '무료체험 부여 이력. MySQL freeExperienceHistory.
 
 
 /* ── trip_deleted — 물리 삭제된 운행의 식별자 ────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_trip_deleted`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_trip_deleted`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_trip_deleted`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_trip_deleted`
 (
   trip_id                  INT64    NOT NULL,
   company_seq              INT64,
@@ -210,8 +210,8 @@ OPTIONS (description = '물리 삭제된 운행. MySQL deleteDrivingLog. raw_tri
 
 
 /* ── company — 기업 마스터 (기업당 1행) ──────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_company`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_company`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_company`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_company`
 (
   company_seq                    INT64  NOT NULL,
   company_code                   STRING,
@@ -240,8 +240,8 @@ OPTIONS (description = '기업 마스터. MySQL company. 인증정보·성명·�
 
 
 /* ── login_admin — PC·브라우저 로그인 이력 ──────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_login_admin`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_login_admin`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_login_admin`
 (
   login_id                 INT64    NOT NULL,
   company_seq              INT64,
@@ -265,8 +265,8 @@ OPTIONS (description = 'PC·브라우저 로그인 이력. MySQL loginBrowserHis
 /* ── login_app — 앱(모바일) 로그인 이력 ──────────────────────────────
    ※ 원본에 updateTime 이 없다. append-only 라 증분 기준이 created_at 이다.
    ※ company_seq 가 없다. user 테이블이 와야 기업에 붙는다.                 */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_login_app`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_login_app`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_login_app`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_login_app`
 (
   login_id                 INT64    NOT NULL,
   user_uid                 STRING,
@@ -287,8 +287,8 @@ OPTIONS (description = '앱 로그인 이력. MySQL userLoginHistory. updateTime
 
 /* ── user — 사용자 1명이 1행 ─────────────────────────────────────────
    uid → 기업 대응이 여기서 풀린다. 사용자 확산 측정의 기준.              */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_user`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_user`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_user`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_user`
 (
   user_id                  INT64    NOT NULL,
   user_uid                 STRING,
@@ -310,8 +310,8 @@ OPTIONS (description = '사용자. MySQL user. 42컬럼 중 13개. 성명·이�
 
 
 /* ── department — 부서. 계층 구조 ───────────────────────────────────── */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_department`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_department`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_department`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_department`
 (
   department_seq           INT64    NOT NULL,
   company_seq              INT64,
@@ -328,8 +328,8 @@ OPTIONS (description = '부서. MySQL department. 부서 개수와 계층 깊이
 /* ── purpose — 운행목적 정의. 기업별이다 ─────────────────────────────
    해석은 (company_seq, 코드) 쌍으로 한다. 코드만으로 묶으면 서로 다른 목적이
    한 덩어리가 된다.                                                      */
-DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_statistics.raw_purpose`;
-CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_statistics.raw_purpose`
+DROP TABLE IF EXISTS `carbiz-6f7fc.cartax_source.raw_purpose`;
+CREATE OR REPLACE TABLE `carbiz-6f7fc.cartax_source.raw_purpose`
 (
   purpose_seq              INT64    NOT NULL,
   company_seq              INT64,

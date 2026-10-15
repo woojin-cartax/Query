@@ -21,7 +21,7 @@
      둘이 어긋나면(관리자 권한은 있는데 콘솔에 안 들어온다) 그 자체가 신호다.
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_user_company` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_source.view_user_company` AS
 WITH u AS (
   SELECT
     company_seq,
@@ -33,13 +33,13 @@ WITH u AS (
     COUNTIF(enabled_state = 'C')                      AS user_count_device_change,
 
     /* 관리자 / 사용자. role_seq = 0 이 최고관리자다 */
-    COUNTIF(`carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq))
+    COUNTIF(`carbiz-6f7fc.cartax_source`.is_super_admin(role_seq))
                                                       AS user_count_admin,
-    COUNTIF(NOT `carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq))
+    COUNTIF(NOT `carbiz-6f7fc.cartax_source`.is_super_admin(role_seq))
                                                       AS user_count_member,
     /* 승인된 사용자 중에서만. 탈퇴·미승인을 빼고 실제 인원을 본다 */
     COUNTIF(enabled_state = 'Y'
-            AND NOT `carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq))
+            AND NOT `carbiz-6f7fc.cartax_source`.is_super_admin(role_seq))
                                                       AS user_count_member_active,
 
     /* 확산 속도. 첫 사용자와 마지막 사용자의 간격 */
@@ -56,7 +56,7 @@ WITH u AS (
                              'nate.com','kakao.com','outlook.com','hotmail.com',
                              'yahoo.com','icloud.com'))
                                                       AS user_portal_email
-  FROM `carbiz-6f7fc.cartax_statistics.raw_user`
+  FROM `carbiz-6f7fc.cartax_source.raw_user`
   GROUP BY company_seq
 ),
 
@@ -65,7 +65,7 @@ d AS (
     company_seq,
     COUNT(*)                                          AS department_count,
     MAX(depth)                                        AS department_max_depth
-  FROM `carbiz-6f7fc.cartax_statistics.raw_department`
+  FROM `carbiz-6f7fc.cartax_source.raw_department`
   GROUP BY company_seq
 )
 
@@ -122,6 +122,6 @@ SELECT
      08번의 is_admin_only(콘솔 로그인 기준)와 다른 각도다 — 이건 명부 기준이다 */
   (IFNULL(u.user_count_member_active, 0) > 0) AS has_member_user
 
-FROM `carbiz-6f7fc.cartax_statistics.view_company` c
+FROM `carbiz-6f7fc.cartax_source.view_company` c
 LEFT JOIN u USING (company_seq)
 LEFT JOIN d USING (company_seq);

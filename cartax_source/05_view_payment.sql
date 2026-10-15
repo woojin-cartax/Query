@@ -14,7 +14,7 @@
    이름 변환은 04_udf.sql 의 plan_name() 한 곳에만 둔다.
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_payment` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_source.view_payment` AS
 WITH
 /* 실제 결제 시도 — 성공·취소 */
 attempt AS (
@@ -57,7 +57,7 @@ attempt AS (
 
     /* 순매출 — 환불을 뺀 실수령액 */
     IFNULL(p.amount, 0) - IFNULL(p.refund_amount, 0) AS net_amount
-  FROM `carbiz-6f7fc.cartax_statistics.raw_payment` p
+  FROM `carbiz-6f7fc.cartax_source.raw_payment` p
 ),
 
 /* 정기결제 예약의 결과 — 실패가 여기에만 남는다 */
@@ -81,7 +81,7 @@ schedule AS (
       WHEN 'C' THEN 'cancel'
       WHEN 'E' THEN 'fail'
     END AS result
-  FROM `carbiz-6f7fc.cartax_statistics.raw_pay_schedule` s
+  FROM `carbiz-6f7fc.cartax_source.raw_pay_schedule` s
 )
 
 /* 두 원천을 하나의 사실 흐름으로 합친다.
@@ -96,7 +96,7 @@ SELECT
   result,
   contract_type               AS raw_type,
   plan_level,
-  `carbiz-6f7fc.cartax_statistics`.plan_name(plan_level) AS plan_name,
+  `carbiz-6f7fc.cartax_source`.plan_name(plan_level) AS plan_name,
   license_count,
   term_month,
   contract_begin_date,
@@ -124,7 +124,7 @@ SELECT
   result,
   status                      AS raw_type,
   plan_level,
-  `carbiz-6f7fc.cartax_statistics`.plan_name(plan_level) AS plan_name,
+  `carbiz-6f7fc.cartax_source`.plan_name(plan_level) AS plan_name,
   license_count,
   CAST(NULL AS INT64)         AS term_month,
   CAST(NULL AS DATE)          AS contract_begin_date,

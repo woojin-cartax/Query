@@ -13,12 +13,12 @@ SELECT
   COUNTIF(is_merge_parent)                                   AS parent_rows,
   COUNTIF(IFNULL(merge_parent_seq,0) > 0
           AND merge_parent_seq NOT IN (
-            SELECT trip_id FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+            SELECT trip_id FROM `carbiz-6f7fc.cartax_source.raw_trip`
             WHERE trip_date >= '2016-01-01'))                AS orphan_child_rows,
   COUNTIF(overlap_state = 'REJECT')                          AS overlap_reject_rows,
   COUNTIF(overlap_state = 'OWN')                             AS overlap_own_rows,
   COUNT(*)                                                   AS total_rows
-FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+FROM `carbiz-6f7fc.cartax_source.raw_trip`
 WHERE trip_date >= '2016-01-01';
 
 
@@ -31,7 +31,7 @@ SELECT
   COUNTIF(IFNULL(gps_distance,0) > 0)                        AS gps_rows,
   ROUND(COUNTIF(IFNULL(gps_distance,0) > 0) / COUNT(*) * 100, 1) AS gps_pct,
   COUNTIF(IFNULL(gps_distance,0) = 0 AND IFNULL(distance,0) > 0) AS manual_rows
-FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+FROM `carbiz-6f7fc.cartax_source.raw_trip`
 WHERE trip_date >= '2016-01-01'
 GROUP BY yr ORDER BY yr;
 
@@ -39,7 +39,7 @@ GROUP BY yr ORDER BY yr;
 /* ── 3. driving_type 실제 값 ──────────────────────────────────────────
    06번이 '수동' 이라는 문자열을 그대로 비교한다. 실제 값이 다르면 판정이 깨진다. */
 SELECT driving_type, COUNT(*) AS row_cnt, COUNTIF(is_auto_start) AS auto_start_rows
-FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+FROM `carbiz-6f7fc.cartax_source.raw_trip`
 WHERE trip_date >= '2016-01-01'
 GROUP BY driving_type ORDER BY row_cnt DESC;
 
@@ -51,15 +51,15 @@ GROUP BY driving_type ORDER BY row_cnt DESC;
    4 이상의 값이 나오면 새 등급이 생긴 것이니 04_udf.sql 을 고친다. */
 SELECT
   c.plan_level,
-  `carbiz-6f7fc.cartax_statistics`.plan_name(c.plan_level) AS plan_name,
+  `carbiz-6f7fc.cartax_source`.plan_name(c.plan_level) AS plan_name,
   COUNT(*)                                          AS companies,
   COUNTIF(s.is_trial_active)                        AS trial_companies,
   COUNTIF(s.pay_method = 'FREE')                    AS pay_method_free,
   COUNTIF(s.pay_method = 'CARD')                    AS pay_method_card,
   COUNTIF(s.pay_method = 'TRANS')                   AS pay_method_trans,
   APPROX_QUANTILES(s.license_count, 4)              AS license_quartiles
-FROM `carbiz-6f7fc.cartax_statistics.raw_company` c
-LEFT JOIN `carbiz-6f7fc.cartax_statistics.raw_company_pay_state` s USING (company_seq)
+FROM `carbiz-6f7fc.cartax_source.raw_company` c
+LEFT JOIN `carbiz-6f7fc.cartax_source.raw_company_pay_state` s USING (company_seq)
 GROUP BY c.plan_level ORDER BY c.plan_level;
 
 
@@ -71,14 +71,14 @@ SELECT
   COUNTIF(company_number IS NOT NULL AND company_number != '') AS has_number,
   ROUND(COUNTIF(company_number IS NOT NULL AND company_number != '')
         / COUNT(*) * 100, 1)                                 AS pct
-FROM `carbiz-6f7fc.cartax_statistics.raw_company`
+FROM `carbiz-6f7fc.cartax_source.raw_company`
 GROUP BY signup_year ORDER BY signup_year;
 
 
 /* ── 6. 결제 실패 사유 — 자유 텍스트에 개인정보가 섞이는지 ────────────
    설계안 10-④. 실제 값을 보고 policy/30_data.md 를 채운다. */
 SELECT error_message, COUNT(*) AS row_cnt
-FROM `carbiz-6f7fc.cartax_statistics.raw_pay_schedule`
+FROM `carbiz-6f7fc.cartax_source.raw_pay_schedule`
 WHERE status = 'E' AND error_message IS NOT NULL
 GROUP BY error_message ORDER BY row_cnt DESC LIMIT 50;
 
@@ -88,7 +88,7 @@ GROUP BY error_message ORDER BY row_cnt DESC LIMIT 50;
    같은 값이 몇 건이나 뭉쳐 있는지 확인하고, 그 구간은 기간 분석에서 뺀다. */
 SELECT DATE(created_at) AS created_date, COUNT(*) AS row_cnt,
        MIN(contract_begin_date) AS min_begin, MAX(contract_begin_date) AS max_begin
-FROM `carbiz-6f7fc.cartax_statistics.raw_payment`
+FROM `carbiz-6f7fc.cartax_source.raw_payment`
 GROUP BY created_date ORDER BY row_cnt DESC LIMIT 10;
 
 
@@ -107,9 +107,9 @@ SELECT
   ROUND(AVG(l.days_since_last_login), 0)            AS avg_days_since_login,
   COUNTIF(s.contract_end_date < CURRENT_DATE("Asia/Seoul")) AS contract_expired,
   COUNTIF(s.is_auto_pay)                            AS auto_pay_on
-FROM `carbiz-6f7fc.cartax_statistics.raw_company` c
-LEFT JOIN `carbiz-6f7fc.cartax_statistics.view_login_company` l USING (company_seq)
-LEFT JOIN `carbiz-6f7fc.cartax_statistics.raw_company_pay_state` s USING (company_seq)
+FROM `carbiz-6f7fc.cartax_source.raw_company` c
+LEFT JOIN `carbiz-6f7fc.cartax_source.view_login_company` l USING (company_seq)
+LEFT JOIN `carbiz-6f7fc.cartax_source.raw_company_pay_state` s USING (company_seq)
 GROUP BY c.enabled_state;
 
 
@@ -121,7 +121,7 @@ SELECT
   COUNT(*)                                          AS row_cnt,
   COUNTIF(REGEXP_CONTAINS(referer, r'[?&]'))        AS has_query_param,
   COUNTIF(REGEXP_CONTAINS(referer, r'@|token|email|passwd|pwd|key=')) AS looks_sensitive
-FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+FROM `carbiz-6f7fc.cartax_source.raw_login_admin`
 WHERE created_at >= '2016-01-01' AND referer IS NOT NULL
 GROUP BY host ORDER BY row_cnt DESC LIMIT 30;
 
@@ -130,11 +130,11 @@ GROUP BY host ORDER BY row_cnt DESC LIMIT 30;
    앱 로그인은 앱 실행마다 남을 수 있다. 그러면 운행보다 클 수도 있다.
    증분 크기를 먼저 재고 파티션·클러스터가 맞는지 판단한다. */
 SELECT 'login_admin' AS tbl, EXTRACT(YEAR FROM created_at) AS yr, COUNT(*) AS row_cnt
-FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin` WHERE created_at >= '2016-01-01'
+FROM `carbiz-6f7fc.cartax_source.raw_login_admin` WHERE created_at >= '2016-01-01'
 GROUP BY yr
 UNION ALL
 SELECT 'login_app', EXTRACT(YEAR FROM created_at), COUNT(*)
-FROM `carbiz-6f7fc.cartax_statistics.raw_login_app` WHERE created_at >= '2016-01-01'
+FROM `carbiz-6f7fc.cartax_source.raw_login_app` WHERE created_at >= '2016-01-01'
 GROUP BY 2
 ORDER BY tbl, yr;
 
@@ -142,15 +142,15 @@ ORDER BY tbl, yr;
 /* ── 11. PC 와 앱의 uid 가 같은 체계인가 ──────────────────────────────
    07번 뷰가 둘 중 큰 쪽을 사용자 수로 쓴다. 두 uid 집합이 아예 다른
    체계라면 그 계산이 틀린다. 겹침을 먼저 확인한다. */
-WITH p AS (SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+WITH p AS (SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_source.raw_login_admin`
            WHERE created_at >= '2016-01-01' AND user_uid IS NOT NULL),
-     a AS (SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_statistics.raw_login_app`
+     a AS (SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_source.raw_login_app`
            WHERE created_at >= '2016-01-01' AND user_uid IS NOT NULL)
 SELECT (SELECT COUNT(*) FROM p)                                  AS pc_uids,
        (SELECT COUNT(*) FROM a)                                  AS app_uids,
        (SELECT COUNT(*) FROM p JOIN a USING (user_uid))          AS both,
        (SELECT COUNT(*) FROM a WHERE user_uid NOT IN (SELECT user_uid FROM
-          `carbiz-6f7fc.cartax_statistics.raw_trip` WHERE trip_date >= '2016-01-01'))
+          `carbiz-6f7fc.cartax_source.raw_trip` WHERE trip_date >= '2016-01-01'))
                                                                  AS app_uid_without_trip;
 
 
@@ -159,7 +159,7 @@ SELECT (SELECT COUNT(*) FROM p)                                  AS pc_uids,
    errorMsg 에 개인정보가 섞이는지도 같이 본다. */
 SELECT error_message, COUNT(*) AS row_cnt,
        COUNT(DISTINCT company_seq) AS companies
-FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+FROM `carbiz-6f7fc.cartax_source.raw_login_admin`
 WHERE created_at >= '2016-01-01' AND NOT is_success
 GROUP BY error_message ORDER BY row_cnt DESC LIMIT 30;
 
@@ -185,9 +185,9 @@ SELECT
   COUNTIF(u.enabled_state = 'Y')                      AS active_users,
   COUNTIF(a.user_uid IS NOT NULL)                     AS has_admin_login,
   ROUND(COUNTIF(a.user_uid IS NOT NULL) / COUNT(*) * 100, 1) AS admin_login_pct
-FROM `carbiz-6f7fc.cartax_statistics.raw_user` u
+FROM `carbiz-6f7fc.cartax_source.raw_user` u
 LEFT JOIN (
-  SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+  SELECT DISTINCT user_uid FROM `carbiz-6f7fc.cartax_source.raw_login_admin`
   WHERE created_at >= '2016-01-01' AND is_success AND user_uid IS NOT NULL
 ) a USING (user_uid)
 GROUP BY 1 ORDER BY users DESC LIMIT 30;
@@ -202,7 +202,7 @@ SELECT
   COUNTIF(user_count_admin >= 2)                      AS companies_with_many_admins,
   COUNTIF(NOT has_member_user)                        AS companies_admin_only,
   COUNT(*)                                            AS companies
-FROM `carbiz-6f7fc.cartax_statistics.view_user_company`;
+FROM `carbiz-6f7fc.cartax_source.view_user_company`;
 
 
 /* ── 14. 사용자 수 — 90일 스냅샷과 어느 정의가 맞는가 ─────────────────
@@ -218,7 +218,7 @@ SELECT
   s.user_count                                      AS snapshot_user_count,
   v.user_count_total   - s.user_count               AS diff_total,
   v.user_count_active  - s.user_count               AS diff_active
-FROM `carbiz-6f7fc.cartax_statistics.view_user_company` v
+FROM `carbiz-6f7fc.cartax_source.view_user_company` v
 JOIN (
   SELECT company_code, user_count
   FROM `carbiz-6f7fc.signup_90days.view_signup_90days_latest`
@@ -236,7 +236,7 @@ SELECT
   COUNTIF(depth = 0)                                AS root_departments,
   MAX(depth)                                        AS max_depth,
   APPROX_QUANTILES(depth, 4)                        AS depth_quartiles
-FROM `carbiz-6f7fc.cartax_statistics.raw_department`;
+FROM `carbiz-6f7fc.cartax_source.raw_department`;
 
 
 /* ── 16. purpose_code 의 조인 키 확정 ────────────────────────────────
@@ -249,22 +249,22 @@ FROM `carbiz-6f7fc.cartax_statistics.raw_department`;
      with_company 와 차이가 크면 코드가 기업 간에 실제로 겹치고 있다는 뜻이다. */
 WITH t AS (
   SELECT company_seq, purpose_code, COUNT(*) AS row_cnt
-  FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+  FROM `carbiz-6f7fc.cartax_source.raw_trip`
   WHERE trip_date >= '2016-01-01' AND purpose_code IS NOT NULL
   GROUP BY company_seq, purpose_code
 )
 SELECT
   SUM(t.row_cnt)                                    AS total_rows,
-  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_source.raw_purpose` p
          WHERE p.company_seq = t.company_seq AND p.purpose_code = t.purpose_code),
          t.row_cnt, 0))                             AS match_by_code,
-  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_source.raw_purpose` p
          WHERE p.company_seq = t.company_seq AND p.purpose_type = t.purpose_code),
          t.row_cnt, 0))                             AS match_by_type,
-  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_source.raw_purpose` p
          WHERE p.company_seq = t.company_seq AND p.purpose_name = t.purpose_code),
          t.row_cnt, 0))                             AS match_by_name,
-  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+  SUM(IF(EXISTS(SELECT 1 FROM `carbiz-6f7fc.cartax_source.raw_purpose` p
          WHERE p.purpose_code = t.purpose_code),
          t.row_cnt, 0))                             AS match_by_code_only
 FROM t;
@@ -278,7 +278,7 @@ SELECT
   COUNT(DISTINCT purpose_name)                      AS distinct_names,
   COUNT(DISTINCT company_seq)                       AS companies,
   ARRAY_AGG(DISTINCT purpose_name IGNORE NULLS LIMIT 8) AS sample_names
-FROM `carbiz-6f7fc.cartax_statistics.raw_purpose`
+FROM `carbiz-6f7fc.cartax_source.raw_purpose`
 GROUP BY purpose_code
 HAVING COUNT(DISTINCT purpose_name) > 1
 ORDER BY distinct_names DESC LIMIT 30;
@@ -289,7 +289,7 @@ SELECT
   purpose_code,
   COUNT(*)                                          AS row_cnt,
   COUNT(DISTINCT company_seq)                       AS companies
-FROM `carbiz-6f7fc.cartax_statistics.raw_trip`
+FROM `carbiz-6f7fc.cartax_source.raw_trip`
 WHERE trip_date >= '2016-01-01'
 GROUP BY purpose_code ORDER BY row_cnt DESC LIMIT 40;
 
@@ -312,7 +312,7 @@ SELECT
   COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
   ROUND(AVG(days_since_last_milestone), 0)          AS avg_days_stuck,
   ROUND(AVG(license_count), 1)                      AS avg_license
-FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+FROM `carbiz-6f7fc.cartax_source.view_company_stage`
 WHERE NOT is_test_account
 GROUP BY is_single_seat, stage, stage_label
 ORDER BY is_single_seat, stage;
@@ -337,7 +337,7 @@ SELECT
   COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
   ROUND(AVG(license_count), 1)                      AS avg_license,
   ROUND(AVG(member_activation_rate) * 100, 1)       AS avg_member_activation_pct
-FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+FROM `carbiz-6f7fc.cartax_source.view_company_stage`
 WHERE NOT is_test_account
 GROUP BY is_single_seat, has_expanded
 ORDER BY is_single_seat, has_expanded;
@@ -366,7 +366,7 @@ SELECT
   APPROX_QUANTILES(days_admin_to_member_trip, 4)    AS days_admin_to_member_q,
   COUNTIF(invited_but_no_trip)                      AS invited_but_no_trip,
   COUNTIF(expansion_stalled)                        AS expansion_stalled
-FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+FROM `carbiz-6f7fc.cartax_source.view_company_stage`
 WHERE NOT is_test_account
   AND NOT is_single_seat          -- 확산 후보(②)를 재려면 확산 가능한 기업만 본다
 GROUP BY status;
@@ -387,7 +387,7 @@ SELECT n,
                                                     AS churned_reached_pct
 FROM (
   SELECT is_withdrawn AS withdrawn, n, d <= 30 AS within_30d
-  FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`,
+  FROM `carbiz-6f7fc.cartax_source.view_company_stage`,
   UNNEST([STRUCT(1 AS n, days_to_trip_1 AS d),
           (3, days_to_trip_3), (5, days_to_trip_5), (10, days_to_trip_10)])
   WHERE NOT is_test_account
@@ -405,7 +405,7 @@ SELECT
   COUNTIF(is_withdrawn)                             AS withdrawn,
   ROUND(AVG(days_to_first_payment), 0)              AS avg_days_to_payment,
   ROUND(AVG(days_to_member_trip), 0)                AS avg_days_to_member_trip
-FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+FROM `carbiz-6f7fc.cartax_source.view_company_stage`
 WHERE NOT is_test_account AND first_payment_date IS NOT NULL
 GROUP BY expanded_before_payment;
 
@@ -441,7 +441,7 @@ SELECT
   COUNTIF(first_payment_date IS NOT NULL)           AS ever_paid,
   ROUND(AVG(admin_trip_count), 0)                   AS avg_admin_trips,
   ROUND(AVG(member_trip_count), 0)                  AS avg_member_trips
-FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+FROM `carbiz-6f7fc.cartax_source.view_company_stage`
 WHERE NOT is_test_account
 GROUP BY license_bucket, user_bucket
 ORDER BY license_bucket, user_bucket;
@@ -466,6 +466,6 @@ SELECT
   COUNTIF(is_auto_pay)                              AS auto_pay_on,
   ROUND(AVG(license_count), 1)                      AS avg_license,
   ROUND(AVG(license_fill_rate) * 100, 1)            AS avg_fill_pct
-FROM `carbiz-6f7fc.cartax_statistics.view_company_stage`
+FROM `carbiz-6f7fc.cartax_source.view_company_stage`
 WHERE NOT is_test_account
 GROUP BY segment ORDER BY companies DESC;

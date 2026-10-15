@@ -42,7 +42,7 @@ DECLARE target_dt DATE DEFAULT DATE_SUB(CURRENT_DATE("Asia/Seoul"), INTERVAL 1 D
 
 DECLARE inserted_cnt INT64 DEFAULT 0;
 
-CREATE TABLE IF NOT EXISTS `carbiz-6f7fc.cartax_statistics.company_daily`
+CREATE TABLE IF NOT EXISTS `carbiz-6f7fc.cartax_source.company_daily`
 (
   snapshot_date            DATE     NOT NULL,
   company_seq              INT64    NOT NULL,
@@ -118,10 +118,10 @@ OPTIONS (
 BEGIN
 
   /* 같은 날짜로 다시 돌려도 안전하게. 지우고 다시 넣는다 */
-  DELETE FROM `carbiz-6f7fc.cartax_statistics.company_daily`
+  DELETE FROM `carbiz-6f7fc.cartax_source.company_daily`
   WHERE snapshot_date = target_dt;
 
-  INSERT INTO `carbiz-6f7fc.cartax_statistics.company_daily`
+  INSERT INTO `carbiz-6f7fc.cartax_source.company_daily`
   WITH
   /* 운행 누적. 스냅샷 기준일까지만 센다 — 나중에 소급 적재해도 같은 값이 나온다 */
   trip AS (
@@ -133,7 +133,7 @@ BEGIN
       COUNTIF(NOT is_admin_created)                   AS member_trip_count_total,
       MIN(trip_date)                                  AS first_trip_date,
       MAX(trip_date)                                  AS last_trip_date
-    FROM `carbiz-6f7fc.cartax_statistics.view_trip`
+    FROM `carbiz-6f7fc.cartax_source.view_trip`
     WHERE trip_date >= '2016-01-01' AND trip_date <= target_dt
       AND is_countable
     GROUP BY company_seq
@@ -146,7 +146,7 @@ BEGIN
       COUNTIF(is_success)                             AS admin_login_count_total,
       MIN(IF(is_success, DATE(created_at), NULL))     AS admin_first_login_date,
       MAX(IF(is_success, DATE(created_at), NULL))     AS admin_last_login_date
-    FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+    FROM `carbiz-6f7fc.cartax_source.raw_login_admin`
     WHERE created_at >= '2016-01-01'
       AND DATE(created_at) <= target_dt
     GROUP BY company_seq
@@ -159,9 +159,9 @@ BEGIN
       COUNT(*)                                        AS app_login_count_total,
       MIN(DATE(a.created_at))                         AS app_first_login_date,
       MAX(DATE(a.created_at))                         AS app_last_login_date
-    FROM `carbiz-6f7fc.cartax_statistics.raw_login_app` a
+    FROM `carbiz-6f7fc.cartax_source.raw_login_app` a
     JOIN (SELECT user_uid, company_seq
-          FROM `carbiz-6f7fc.cartax_statistics.raw_user`
+          FROM `carbiz-6f7fc.cartax_source.raw_user`
           WHERE user_uid IS NOT NULL AND company_seq IS NOT NULL) u
       USING (user_uid)
     WHERE a.created_at >= '2016-01-01'
@@ -177,7 +177,7 @@ BEGIN
       SUM(IF(result = 'success', net_amount, 0))      AS payment_amount_total,
       MIN(IF(result = 'success', event_date, NULL))   AS first_payment_date,
       MAX(IF(result = 'success', event_date, NULL))   AS last_payment_date
-    FROM `carbiz-6f7fc.cartax_statistics.view_payment`
+    FROM `carbiz-6f7fc.cartax_source.view_payment`
     WHERE source = 'payment' AND event_date <= target_dt
     GROUP BY company_seq
   )
@@ -239,8 +239,8 @@ BEGIN
     p.last_payment_date,
 
     CURRENT_TIMESTAMP()                               AS loaded_at
-  FROM `carbiz-6f7fc.cartax_statistics.view_company` c
-  LEFT JOIN `carbiz-6f7fc.cartax_statistics.view_user_company` u USING (company_seq)
+  FROM `carbiz-6f7fc.cartax_source.view_company` c
+  LEFT JOIN `carbiz-6f7fc.cartax_source.view_user_company` u USING (company_seq)
   LEFT JOIN trip t   USING (company_seq)
   LEFT JOIN la       USING (company_seq)
   LEFT JOIN app      USING (company_seq)
@@ -248,13 +248,13 @@ BEGIN
 
   SET inserted_cnt = @@row_count;
 
-  INSERT INTO `carbiz-6f7fc.cartax_statistics.query_run_log`
+  INSERT INTO `carbiz-6f7fc.cartax_source.query_run_log`
   VALUES (target_dt, 'company_daily_snapshot', 'company_daily',
           IF(inserted_cnt = 0, 'EMPTY', 'SUCCESS'),
           inserted_cnt, CAST(NULL AS INT64), CAST(NULL AS STRING), CURRENT_TIMESTAMP());
 
 EXCEPTION WHEN ERROR THEN
-  INSERT INTO `carbiz-6f7fc.cartax_statistics.query_run_log`
+  INSERT INTO `carbiz-6f7fc.cartax_source.query_run_log`
   VALUES (target_dt, 'company_daily_snapshot', 'company_daily', 'FAIL',
           CAST(NULL AS INT64), CAST(NULL AS INT64),
           @@error.message, CURRENT_TIMESTAMP());

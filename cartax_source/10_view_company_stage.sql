@@ -39,17 +39,17 @@
      테이블로 굳힌다 (설계안 03번의 「캐시」 층).
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_company_stage` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_source.view_company_stage` AS
 WITH
 /* 관리자가 아닌 사용자. 2단계 판정의 기준이 된다.
    created_at 을 여기서 같이 들고 나온다 — 아래에서 raw_user 를 다시 조인하면
    company_seq 가 양쪽에 생겨 모호해진다. */
 member_uid AS (
   SELECT user_uid, company_seq, created_at
-  FROM `carbiz-6f7fc.cartax_statistics.raw_user`
+  FROM `carbiz-6f7fc.cartax_source.raw_user`
   WHERE user_uid IS NOT NULL
     AND company_seq IS NOT NULL
-    AND NOT `carbiz-6f7fc.cartax_statistics`.is_super_admin(role_seq)
+    AND NOT `carbiz-6f7fc.cartax_source`.is_super_admin(role_seq)
 ),
 
 /* 회사의 N번째 운행이 언제였나. 누가 기록했는지는 보지 않는다.
@@ -62,7 +62,7 @@ trip_rank AS (
     company_seq, trip_date,
     ROW_NUMBER() OVER (PARTITION BY company_seq
                        ORDER BY trip_date, start_time, trip_id) AS rn
-  FROM `carbiz-6f7fc.cartax_statistics.view_trip`
+  FROM `carbiz-6f7fc.cartax_source.view_trip`
   WHERE trip_date >= '2016-01-01'
     AND is_countable
 ),
@@ -89,7 +89,7 @@ trip AS (
     COUNTIF(is_admin_created)                         AS admin_trip_count,
     COUNTIF(NOT is_admin_created)                     AS member_trip_count,
     COUNT(DISTINCT IF(NOT is_admin_created, user_uid, NULL)) AS member_with_trip_count
-  FROM `carbiz-6f7fc.cartax_statistics.view_trip`
+  FROM `carbiz-6f7fc.cartax_source.view_trip`
   WHERE trip_date >= '2016-01-01'
     AND is_countable
   GROUP BY company_seq
@@ -101,7 +101,7 @@ member_login AS (
     m.company_seq,
     MIN(a.created_at)                                 AS member_first_login_at,
     COUNT(DISTINCT a.user_uid)                        AS member_logged_in_count
-  FROM `carbiz-6f7fc.cartax_statistics.raw_login_app` a
+  FROM `carbiz-6f7fc.cartax_source.raw_login_app` a
   JOIN member_uid m USING (user_uid)
   WHERE a.created_at >= '2016-01-01'
   GROUP BY m.company_seq
@@ -117,7 +117,7 @@ member_created AS (
 /* 첫 결제 성공 */
 pay AS (
   SELECT company_seq, MIN(event_date) AS first_payment_date
-  FROM `carbiz-6f7fc.cartax_statistics.view_payment`
+  FROM `carbiz-6f7fc.cartax_source.view_payment`
   WHERE result = 'success' AND source = 'payment'
   GROUP BY company_seq
 ),
@@ -166,9 +166,9 @@ base AS (
 
     /* 수집이 구조적으로 제한된 기업. 운행이 적은 것을 사용 부진으로 오진하지 않기 위해 */
     c.has_restricted_logging
-  FROM `carbiz-6f7fc.cartax_statistics.view_company` c
-  LEFT JOIN `carbiz-6f7fc.cartax_statistics.view_login_company` l USING (company_seq)
-  LEFT JOIN `carbiz-6f7fc.cartax_statistics.view_user_company`  u USING (company_seq)
+  FROM `carbiz-6f7fc.cartax_source.view_company` c
+  LEFT JOIN `carbiz-6f7fc.cartax_source.view_login_company` l USING (company_seq)
+  LEFT JOIN `carbiz-6f7fc.cartax_source.view_user_company`  u USING (company_seq)
   LEFT JOIN trip           t  USING (company_seq)
   LEFT JOIN trip_nth       n  USING (company_seq)
   LEFT JOIN member_login   ml USING (company_seq)

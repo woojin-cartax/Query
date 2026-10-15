@@ -29,7 +29,7 @@ MySQL 원천 → parquet → GCS 적재기
 
 접속 정보는 환경변수로 받는다. 코드에 적지 않는다.
   MYSQL_HOST MYSQL_PORT MYSQL_USER MYSQL_PASSWORD MYSQL_DB
-  GCS_BUCKET   (기본 cartax-biz_cartax_statistics)
+  GCS_BUCKET   (기본 cartax-biz_cartax_source)
 """
 import argparse, io, os, re, sys, datetime, pathlib
 
@@ -201,7 +201,7 @@ def main():
     ap.add_argument('--dt', help='GCS 폴더 날짜. 기본은 오늘(KST)')
     ap.add_argument('--full', action='store_true', help='기간 조건 없이 전량')
     ap.add_argument('--year', type=int, help='--full 과 함께. 운행을 연도로 자른다')
-    ap.add_argument('--bucket', default=os.environ.get('GCS_BUCKET', 'cartax-biz_cartax_statistics'))
+    ap.add_argument('--bucket', default=os.environ.get('GCS_BUCKET', 'cartax-biz_cartax_source'))
     ap.add_argument('--dry-run', action='store_true', help='접속하지 않고 SQL 만 출력')
     args = ap.parse_args()
 

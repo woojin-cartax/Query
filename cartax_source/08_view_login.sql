@@ -32,12 +32,12 @@
      자주 쓰게 되면 뷰가 아니라 테이블로 굳힌다 (설계안 03번의 「캐시」).
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_login_company` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_source.view_login_company` AS
 WITH
 /* uid → 기업. user 테이블이 원천이다 */
 uid_company AS (
   SELECT user_uid, company_seq
-  FROM `carbiz-6f7fc.cartax_statistics.raw_user`
+  FROM `carbiz-6f7fc.cartax_source.raw_user`
   WHERE user_uid IS NOT NULL AND company_seq IS NOT NULL
 ),
 
@@ -60,7 +60,7 @@ pc AS (
                                                        AS admin_last_attempt_success,
     ARRAY_AGG(error_message IGNORE NULLS ORDER BY created_at DESC LIMIT 1)[SAFE_OFFSET(0)]
                                                        AS admin_last_error_message
-  FROM `carbiz-6f7fc.cartax_statistics.raw_login_admin`
+  FROM `carbiz-6f7fc.cartax_source.raw_login_admin`
   WHERE created_at >= '2016-01-01'
   GROUP BY company_seq
 ),
@@ -81,7 +81,7 @@ app AS (
                                                        AS app_latest_version,
     COUNTIF(a.os_type = 'iOS')                         AS app_login_ios,
     COUNTIF(a.os_type = 'Android')                     AS app_login_android
-  FROM `carbiz-6f7fc.cartax_statistics.raw_login_app` a
+  FROM `carbiz-6f7fc.cartax_source.raw_login_app` a
   JOIN uid_company u USING (user_uid)
   WHERE a.created_at >= '2016-01-01'
   GROUP BY u.company_seq
@@ -137,6 +137,6 @@ SELECT
                   IFNULL(app.app_last_login_at, DATETIME '1970-01-01'))),
     DAY)                                               AS days_since_last_login
 
-FROM `carbiz-6f7fc.cartax_statistics.view_company` c
+FROM `carbiz-6f7fc.cartax_source.view_company` c
 LEFT JOIN pc  USING (company_seq)
 LEFT JOIN app USING (company_seq);

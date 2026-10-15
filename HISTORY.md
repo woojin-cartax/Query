@@ -7,6 +7,36 @@
 ```
 
 
+## 2026-10-15 — cartax_statistics → cartax_source 개명. 상태 표기 정정
+
+**개명.** 원천 13테이블을 받는 폴더가 「statistics」라는 이름을 달고 있었고,
+집계 스냅샷을 받는 `signup_statistics` 와 나란히 있어 둘의 차이를 이름으로 알 수 없었다.
+실제로 「둘이 뭐가 다르냐」는 질문이 나왔다. 차이는 받는 데이터의 입자다 —
+`cartax_source` 는 운행 1건 = 1행, `signup_statistics` 는 고객사 1곳 = 하루 1행.
+
+배포 전이라 데이터셋·버킷·예약 쿼리 이름(`cartax_source`, `gs://cartax-biz_cartax_source/`,
+`cartax_source_merge`)까지 문자열 치환으로 끝났다. 두 번째 개명이다(`source_db` →
+`cartax_statistics`, 2026-09-12). 이 파일의 과거 항목은 당시 이름 그대로 둔다.
+수집 명세·설계안 3판 산출물도 고치지 않았다 — README 링크에 「본문의 `cartax_statistics` =
+지금의 `cartax_source`」를 붙였다. 진행은 **내부 컨펌 대기.**
+
+**`signup_statistics` → `signup_company_daily` 는 보류.** 「signup」인데 운행·결제·로그인
+집계가 들어 있어 이름이 틀렸다. 그러나 운영 중이다. 데이터셋은 개명이 안 돼서
+새 데이터셋 → 테이블 복사 → 뷰 재생성 → 예약 쿼리 재등록 → 구 데이터셋 삭제가 필요하다.
+폴더명은 데이터셋명과 같아야 하므로(`policy/10_naming.md`) 폴더만 먼저 바꾸지 않았다.
+루트 README 열린 항목 7번.
+
+**상태 표기가 9일간 틀려 있었다.** `signup_statistics` 를 10-06 에 배포하고 HISTORY 에는
+적었으나 루트 README 「지금 무엇이 돌고 있나」 표에 넣지 않았다. 「운영 중인 것은
+`signup_90days` 하나다」가 그대로 남았고, `signup_statistics/README.md` 는 「배포 전.
+데이터셋을 아직 만들지 않았다」였다. CLAUDE.md 가 새 세션에 가장 먼저 읽게 하는 절이다.
+배포 커밋에 README 상태 갱신을 같이 넣는 것을 빠뜨렸다.
+
+같이 확인한 운영 상태: `signup_statistics_daily` 10-06 ~ 10-14 9회 전부 SUCCEEDED,
+`raw_signup_statistics` 431,416 → 616,973행(하루 약 2.06만), 마지막 수정 10-14 23:30:16.
+SUCCESS 만이 아니라 행 수 증가로 확인했다 — 7월에 SUCCESS 를 찍으며 34일간 0행을
+넣은 적이 있다. 날짜별 균일성은 보지 않았다(총합만 메타데이터로 확인, 스캔 0).
+
 ## 2026-10-06 — corporate_number 로 중복 판정 재설계. 뷰 2개 배포
 
 `signup_statistics` 에만 있는 사업자등록번호가 중복 판정을 추측에서 확정으로 바꾼다.

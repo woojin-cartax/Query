@@ -16,7 +16,7 @@
        ③ GPS 실운행 판정       gps_distance > 0 이면 실제 주행이라는 전제
    ========================================================================= */
 
-CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_statistics.view_trip` AS
+CREATE OR REPLACE VIEW `carbiz-6f7fc.cartax_source.view_trip` AS
 SELECT
   t.trip_id,
   t.company_seq,
@@ -90,7 +90,7 @@ SELECT
   t.overlap_state,
   t.created_at,
   t.updated_at
-FROM `carbiz-6f7fc.cartax_statistics.raw_trip` t
+FROM `carbiz-6f7fc.cartax_source.raw_trip` t
 
 /* ── 운행목적 이름 붙이기 ──────────────────────────────────────────────
    ★ 조인 키가 아직 확정되지 않았다.
@@ -106,6 +106,6 @@ FROM `carbiz-6f7fc.cartax_statistics.raw_trip` t
 
    purpose_state = 'X'(삭제)인 정의도 남긴다. 과거 운행이 그 목적으로 기록됐고,
    지금 지워졌다고 해서 그때 기록이 없어지는 것은 아니다.                     */
-LEFT JOIN `carbiz-6f7fc.cartax_statistics.raw_purpose` p
+LEFT JOIN `carbiz-6f7fc.cartax_source.raw_purpose` p
   ON  t.company_seq  = p.company_seq
   AND t.purpose_code = p.purpose_code;

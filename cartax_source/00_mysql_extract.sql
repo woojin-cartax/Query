@@ -4,7 +4,7 @@
    이 파일은 BigQuery가 아니라 서비스 MySQL에서 실행한다. 우리는 실행하지 않는다.
    결과를 parquet으로 아래 경로에 올리면 01번 외부 테이블이 그대로 읽는다.
 
-       gs://cartax-biz_cartax_statistics/<테이블>/dt=YYYY-MM-DD/*.parquet
+       gs://cartax-biz_cartax_source/<테이블>/dt=YYYY-MM-DD/*.parquet
 
    컬럼 별칭을 여기서 이미 snake_case로 맞춰 둔다. parquet 단계에서 이름이
    정리되어 있으면 BigQuery 쪽 적재가 SELECT * 한 줄로 끝난다.
