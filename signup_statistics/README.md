@@ -6,6 +6,7 @@
 
 | 문서 | 무엇 |
 |---|---|
+| [신규 가입 회사 추이](https://claude.ai/artifact/FAwvEYTJ8aPAasQfabLJZC) | 월별 연도 비교(2016~)·2026 주별. `91_signup_trend.sql` 결과, 10-15 스냅샷 |
 | [raw_signup_statistics 컬럼 명세](https://claude.ai/artifact/1b3GFAzF2yyd9wx8PCJ4V6) | 38컬럼의 뜻·원천 대응·실측값(2026-10-15)·함정. 가입 경로 기록 단절, 피드에 없는 원천 컬럼, 개발팀 확인 목록 |
 
 ## 상태
@@ -66,6 +67,7 @@ PC/모바일 구분(원천 `joinType`: pc · mobile · ios · and)은 **두 피�
 | `04_view_derived.sql` | BigQuery | 파생 컬럼. **판정은 전부 여기서 한 번만** |
 | `05_view_dedup.sql` | BigQuery | 중복기업 판정. 사업자번호 1순위 |
 | `50_run_log.sql` | BigQuery | 실행 기록. 최초 1회 |
+| `91_signup_trend.sql` | BigQuery | **조회용.** 신규 가입 회사 주별·월별. 중복은 가입 시점 기준 |
 
 ## 적재 방식
 
