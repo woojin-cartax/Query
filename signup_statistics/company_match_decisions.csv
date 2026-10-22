@@ -1,0 +1,4 @@
+requested_at,decided_at,new_code,new_name,prior_code,prior_name,why_asked,answer,decided_by,note
+2026-10-23,2026-10-23,G946,(주)그린약품,G291,그린약품,회사명만 같음 · 사업자번호 한쪽만(새 계정만 있음) · 아이디 다름,different,woojin,같은 회사로 봤다면 신규→중복
+2026-10-23,2026-10-23,B1048,베스핀글로벌 주식회사,J191,베스핀 글로벌,회사명만 같음 · 사업자번호 한쪽만(새 계정만 있음) · 아이디 다름,different,woojin,판정 무관(B851 때문에 이미 중복)
+,2026-10-23,U350,주식회사 어반클래지,U349,주식회사 어반클래지(URBAN CLASSY Inc.),아이디 같음 · 정규화 회사명 다름(영문 병기) · 사업자번호 다름,same,woojin,이전 세션 수동 지정(요청일 기록 없음)을 10-23 재확인
