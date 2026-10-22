@@ -1,4 +1,4 @@
-requested_at,decided_at,new_code,new_name,prior_code,prior_name,why_asked,answer,decided_by,note
-2026-10-23,2026-10-23,G946,(주)그린약품,G291,그린약품,회사명만 같음 · 사업자번호 한쪽만(새 계정만 있음) · 아이디 다름,different,woojin,같은 회사로 봤다면 신규→중복
-2026-10-23,2026-10-23,B1048,베스핀글로벌 주식회사,J191,베스핀 글로벌,회사명만 같음 · 사업자번호 한쪽만(새 계정만 있음) · 아이디 다름,different,woojin,판정 무관(B851 때문에 이미 중복)
-,2026-10-23,U350,주식회사 어반클래지,U349,주식회사 어반클래지(URBAN CLASSY Inc.),아이디 같음 · 정규화 회사명 다름(영문 병기) · 사업자번호 다름,same,woojin,이전 세션 수동 지정(요청일 기록 없음)을 10-23 재확인
+requested_at,decided_at,new_code,prior_code,corp_no,company_name,login_id,prior_signup,prior_activity,answer,decided_by,note
+2026-10-23,2026-10-23,G946,G291,새 계정만 있음,정규화 같음 (원문은 법인격 표기만 다름),다름,2021-08,운행 0,different,woojin,같은 회사로 봤다면 신규→중복
+2026-10-23,2026-10-23,B1048,J191,새 계정만 있음,정규화 같음 (원문은 띄어쓰기·법인격만 다름),다름,2019-08,운행 0,different,woojin,판정 결과 무관 — 다른 이전 계정 B851 때문에 이미 중복
+,2026-10-23,U350,U349,둘 다 있음 · 다름,정규화 다름 (이전 계정에 영문 병기 추가),같음,2026-10,가입 5일 차,same,woojin,규칙상 다른 회사지만 수동 확정. 이전 세션 수동 지정(요청일 기록 없음)을 10-23 재확인
