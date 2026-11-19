@@ -1,7 +1,7 @@
 import importlib.util, collections, csv, datetime as dt, sys
 import os; Q = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "92_weekly_signup.py")
 spec = importlib.util.spec_from_file_location("w", Q); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
-usage_path, out = sys.argv[1:3]
+usage_path, out = sys.argv[1:3]; crm_paths = sys.argv[3:]  # CRM-PAYMENT export (선택)
 SNAP, STAT0, R90_0 = "2026-11-18", "2026-09-15", "2026-01-26"
 W0 = dt.date(2026, 1, 1); END = dt.date(2026, 11, 18)
 WEEKS = [W0 + dt.timedelta(days=7 * i) for i in range((END - W0).days // 7 + 1)]
@@ -112,6 +112,14 @@ for q in sorted(stat, key=lambda q: q["d"]):
     else:
         up[wk(d)][1] += -int(q["dv"])
 
+# ---- CRM-PAYMENT export 가 덮는 주는 CRM 이 원천 (crm_payments.py 참고)
+crm_weeks = set()
+if crm_paths:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import crm_payments as cp
+    days, crm = cp.load(crm_paths, test_codes); crm_weeks = cp.covered_weeks(days, wk)
+    sig = {c: D(r["s"][:10]) for c, r in by_code.items()}
+    paid_all = cp.override(paid_all, crm, crm_weeks, wk, lambda c, d: c in sig)
+    paid90 = cp.override(paid90, crm, crm_weeks, wk, lambda c, d: c in sig and (d - sig[c]).days + 1 <= 90)
 STAT_W = dt.date(2026, 9, 17); R90_W = dt.date(2026, 1, 29)
 with open(out, "w", encoding="utf-8-sig", newline="") as f:
     wr = csv.writer(f)
@@ -134,6 +142,7 @@ with open(out, "w", encoding="utf-8-sig", newline="") as f:
         else:
             row += ["", "", "", "", ""]
             if W >= R90_W: note.append("전계정 결제·업셀: 9/17주부터")
+        if W in crm_weeks: note.append("결제: CRM-PAYMENT 기준")
         if W < dt.date(2026, 9, 10): note.append("v4 이전계정 상태 9/15 대용")
         if dt.date(2026, 6, 25) <= W <= dt.date(2026, 7, 23): note.append("원천 이상 6/30~7/21·7/29 — 결제 상태 추정(가입 14일 규칙)")
         row.append(" · ".join(note)); wr.writerow(row)

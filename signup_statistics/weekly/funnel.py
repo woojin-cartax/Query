@@ -1,7 +1,7 @@
 import importlib.util, collections, csv, datetime as dt, statistics, sys
 import os; Q = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "92_weekly_signup.py")
 spec = importlib.util.spec_from_file_location("w", Q); w = importlib.util.module_from_spec(spec); spec.loader.exec_module(w)
-usage_path, out_dir = sys.argv[1:3]
+usage_path, out_dir = sys.argv[1:3]; crm_paths = sys.argv[3:]  # CRM-PAYMENT export (선택)
 SNAP, FIRST_SNAP = "2026-11-18", "2026-09-15"
 W0 = dt.date(2026, 8, 27); END = dt.date(2026, 11, 18)
 WEEKS = [W0 + dt.timedelta(days=7 * i) for i in range(12)]
@@ -91,6 +91,14 @@ for c, h in hist.items():
         if tr is not None: pt = tr
         pp = pa
 
+# ---- CRM-PAYMENT export 가 덮는 주는 CRM 이 원천 (crm_payments.py 참고)
+crm_weeks = set()
+if crm_paths:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import crm_payments as cp
+    days, crm = cp.load(crm_paths, test_codes); crm_weeks = cp.covered_weeks(days, wk)
+    sig = {c: D(r["s"][:10]) for c, r in by_code.items()}
+    paid = cp.override(paid, crm, crm_weeks, wk, lambda c, d: c in sig and (d - sig[c]).days + 1 <= 90)
+
 # ---- 1) 주간 퍼널
 with open(f"{out_dir}/weekly_funnel_12w.csv", "w", encoding="utf-8-sig", newline="") as f:
     wr = csv.writer(f)
@@ -107,6 +115,7 @@ with open(f"{out_dir}/weekly_funnel_12w.csv", "w", encoding="utf-8-sig", newline
         note = []
         if any(c in proxied for c in nw): note.append("v4 이전계정 상태 9/15 스냅샷 대용")
         if (END - W).days < 21: note.append("전환율 미성숙 — 주 마지막 가입이 15일차 미도달")
+        if W in crm_weeks: note.append("결제: CRM-PAYMENT 기준")
         wr.writerow([W, e, len(nw), sum(vc_now.get(c, 0) for c in nw),
                      len(tw), sum(trial[c][1] for c in tw), len(pw), sum(paid[c][1] for c in pw),
                      len(conv), f"{len(conv) / len(tw):.1%}" if tw else "", " · ".join(note)])

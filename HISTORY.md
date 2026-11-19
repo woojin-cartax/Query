@@ -7,6 +7,12 @@
 ```
 
 
+## 2026-11-19 — 주간 신규결제를 CRM-PAYMENT export 기준으로
+
+스냅샷으로 센 11/12주 신규결제가 틀렸다(오탐 N649·H738, 체험 B1054, 누락 B1029).
+`crm_payments.py` 를 추가하고 `ytd.py`·`funnel.py` 가 CRM export 를 받으면 그 주 결제를 CRM 으로 바꾸게 했다.
+11/12주 전계정 6건·102대 → 5건·32대, 90일내 5건·15대 → 4건·10대.
+
 ## 2026-11-19 — CX 주간 집계 스크립트를 signup_statistics/weekly/ 로 반입
 
 scratchpad 에서 돌리던 cx_list · ytd · funnel · detail · combo 와 신규 결제 SQL 을 옮겼다.
